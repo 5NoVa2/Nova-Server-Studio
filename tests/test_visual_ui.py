@@ -220,6 +220,25 @@ class VisualUITests(unittest.TestCase):
   self.manager.playit.prepared=True;self.manager.playit.claim='https://playit.gg/claim/0123456789';self.manager.changed.emit();QTest.qWait(30)
   self.assertTrue(self.window.findChild(QObject,'claimPlayitButton').property('enabled'))
   self.manager.update('use_vps',True);QTest.qWait(30);self.assertFalse(self.window.findChild(QObject,'settingsUsePlayitToggle').property('checked'))
+ def test_long_connection_status_stays_inside_cards_at_supported_widths(self):
+  from PySide6.QtCore import QPointF
+  self.manager.active.timer.stop();self.manager.active.s.update(use_playit=True,use_vps=False)
+  intro=self.load();intro.finish()
+  self.manager.active.publish(tunnel='Agent running · configure tunnel')
+  def items(item):
+   yield item
+   for child in item.childItems():yield from items(child)
+  for width in (1040,1260,1920):
+   self.window.setWidth(width);self.window.setProperty('page',1);QTest.qWait(80)
+   card=next(i for i in items(self.window.contentItem()) if i.objectName()=='serverStatCard_CONNECTION')
+   value=next(i for i in items(card) if i.objectName()=='serverStatValue_CONNECTION')
+   origin=value.mapToItem(card,QPointF(0,0))
+   self.assertGreater(value.property('lineCount'),1)
+   self.assertLessEqual(origin.x()+value.width(),card.width()-19)
+   self.assertLessEqual(origin.y()+value.property('contentHeight'),card.height()-19)
+   self.assertFalse(value.property('truncated'))
+   self.window.setProperty('page',0);QTest.qWait(30)
+   hero=self.window.findChild(QObject,'heroConnectionStatus');self.assertLessEqual(hero.width(),hero.parentItem().width())
  def test_settings_domain_editor_save_validation_and_profile_isolation(self):
   from settings_store import SettingsStore
   self.manager.active.update('vps_host','203.0.113.20');self.manager.active.update('remote_java_port',25566)

@@ -161,10 +161,17 @@ ApplicationWindow {
                                     }
                                     Text { objectName: 'serverHeroName'; text: s.profileName || 'My server'; color: '#f5f6fa'; font.pixelSize: 35; font.weight: Font.Light; Layout.fillWidth: true; elide: Text.ElideRight }
                                     Body { text: (s.cf_pack.name || 'Minecraft '+s.version)+'  ·  '+(s.joinDisplay || 'localhost'); Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1 }
-                                    RowLayout { spacing: 24
+                                    RowLayout { spacing: 24; Layout.fillWidth: true
                                         Column { spacing: 5; Text { text: (s.players || []).length; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'PLAYERS'; font.pixelSize: 9 } }
                                         Column { spacing: 5; Text { text: s.uptime; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'UPTIME'; font.pixelSize: 9 } }
-                                        Column { spacing: 5; Text { text: s.use_playit ? s.tunnel : s.use_vps===false ? 'Direct hosting' : s.tunnel; color: '#eef2f8'; font.pixelSize: 18 } Caption { text: s.use_playit ? 'PLAYIT.GG' : s.use_vps===false ? 'CONNECTION MODE' : 'PUBLIC TUNNEL'; font.pixelSize: 9 } }
+                                        Column { spacing: 5; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 140
+                                            Text { objectName: 'heroConnectionStatus'; width: parent.width; text: s.use_playit ? s.tunnel : s.use_vps===false ? 'Direct hosting' : s.tunnel; color: '#eef2f8'; font.pixelSize: 18; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; textFormat: Text.PlainText
+                                                HoverHandler { id: connectionHover }
+                                                ToolTip.visible: connectionHover.hovered
+                                                ToolTip.text: text
+                                            }
+                                            Caption { text: s.use_playit ? 'PLAYIT.GG' : s.use_vps===false ? 'CONNECTION MODE' : 'PUBLIC TUNNEL'; font.pixelSize: 9 }
+                                        }
                                     }
                                     Item { Layout.fillHeight: true }
                                     RowLayout { spacing: 10
@@ -242,10 +249,10 @@ ApplicationWindow {
                         Heading { text: (s.profileName || 'Your server')+', at a glance.'; Layout.fillWidth: true; elide: Text.ElideRight }
                         RowLayout { Layout.fillWidth: true; spacing: 12
                             Repeater { model: [{label:'SERVER',value:s.server},{label:s.use_playit || s.use_vps===false ? 'CONNECTION' : 'TUNNEL',value:s.use_playit ? s.tunnel+' · playit.gg' : s.use_vps===false ? 'Direct · no VPS' : s.tunnel},{label:'UPTIME',value:s.uptime},{label:'CPU',value:win.cpuText(s.cpuLoad)},{label:'RAM',value:win.ramText(s.ramBytes)}]
-                                Panel { required property var modelData; Layout.fillWidth: true; implicitHeight: 100
-                                    Column { anchors.fill: parent; anchors.margins: 20; spacing: 10
+                                Panel { required property var modelData; objectName: 'serverStatCard_'+modelData.label; Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 0; implicitHeight: Math.max(100,statusColumn.implicitHeight+40)
+                                    Column { id: statusColumn; anchors.fill: parent; anchors.margins: 20; spacing: 10
                                         Caption { text: modelData.label }
-                                        Text { text: modelData.value; color: '#f3f5fc'; font.pixelSize: 21 }
+                                        Text { objectName: 'serverStatValue_'+modelData.label; width: parent.width; text: modelData.value; color: '#f3f5fc'; font.pixelSize: 21; wrapMode: Text.Wrap; textFormat: Text.PlainText }
                                     }
                                 }
                             }
