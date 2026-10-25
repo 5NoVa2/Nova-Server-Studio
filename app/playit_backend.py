@@ -120,8 +120,8 @@ class PlayitManager:
             if self.poll() is None:return
             root,exe,secret=paths(self.cache)
             if not verified(exe):raise ValueError('Choose Prepare playit first to download and verify the official agent.')
-            secret.parent.mkdir(parents=True,exist_ok=True)
-            if os.name!='nt':secret.parent.chmod(0o700)
+            from private_files import protect_agent_directory
+            protect_agent_directory(secret.parent)
             env=dict(os.environ)
             for key in ('PLAYIT_SECRET','PLAYIT_SECRET_PATH','API_BASE','PLAYIT_LOG'):env.pop(key,None)
             env['PLAYIT_LOG']='info'

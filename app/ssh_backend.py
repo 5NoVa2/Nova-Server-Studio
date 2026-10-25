@@ -23,19 +23,23 @@ def ensure_ssh(log):
     finally:_dependency_lock.release()
 
 def _ensure_ssh(log):
-    vendor=CACHE/'ssh-libs'
+    vendor=CACHE/'ssh-libs-locked-v1'
     if str(vendor) not in sys.path:sys.path.insert(0,str(vendor))
-    try:return importlib.import_module('paramiko')
-    except ImportError:pass
+    lockfile=Path(__file__).with_name('ssh-requirements.txt')
+    expected=hashlib.sha256(lockfile.read_bytes()).hexdigest()
+    marker=vendor/'.requirements-sha256'
+    if marker.is_file() and marker.read_text()==expected:
+        return importlib.import_module('paramiko')
     log('Installing SSH support locally. First use only; no terminal window is opened...')
     vendor.mkdir(parents=True,exist_ok=True)
     python=Path(sys.executable)
     if python.name.lower()=='pythonw.exe' and python.with_name('python.exe').exists():
         python=python.with_name('python.exe')
-    with managed_popen([str(python),'-m','pip','install','--disable-pip-version-check','--no-input','--target',str(vendor),'paramiko>=3.5,<5'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0)) as proc:
+    with managed_popen([str(python),'-m','pip','install','--disable-pip-version-check','--no-input','--upgrade','--target',str(vendor),'--isolated','--index-url','https://pypi.org/simple','--only-binary=:all:','--require-hashes','-r',str(Path(__file__).with_name('ssh-requirements.txt'))],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0)) as proc:
         for line in proc.stdout:log(line.rstrip())
         code=proc.wait()
     if code:raise ValueError('SSH support could not be installed. Check the installation log and retry.')
+    marker.write_text(expected)
     importlib.invalidate_caches()
     return importlib.import_module('paramiko')
 
@@ -97,18 +101,22 @@ class ReverseTunnel:
         self.client=client;self.transport=client.get_transport();self.log=log
         from connection_settings import port
         self.local_port=port(local_port);self.remote_port=port(remote_port)
-        self.stopped=threading.Event();self.lock=threading.Lock();self.connections=set()
+        self.stopped=threading.Event();self.lock=threading.Lock();self.connections=set();self.slots=threading.BoundedSemaphore(64)
         try:self.transport.request_port_forward('0.0.0.0',self.remote_port,handler=self.accept)
         except Exception:
             client.close();raise ValueError(f'VPS refused public port {self.remote_port}. Configure the VPS first and stop any old tunnel using that port.')
         self.log(f'Tunnel connected: VPS TCP {self.remote_port} -> this PC 127.0.0.1:{self.local_port}.')
     def poll(self):return 0 if self.stopped.is_set() or not self.transport.is_active() else None
     def accept(self,channel,origin,server):
-        threading.Thread(target=self.bridge,args=(channel,),daemon=True).start()
+        if self.stopped.is_set() or not self.slots.acquire(blocking=False):
+            channel.close();return
+        try:threading.Thread(target=self.bridge,args=(channel,),daemon=True).start()
+        except Exception:
+            self.slots.release();channel.close();raise
     def bridge(self,channel):
         local=None;pair=None
         try:
-            local=socket.create_connection(('127.0.0.1',self.local_port),timeout=10);local.settimeout(None)
+            local=socket.create_connection(('127.0.0.1',self.local_port),timeout=10);local.settimeout(120);channel.settimeout(120)
             pair=(channel,local)
             with self.lock:
                 if self.stopped.is_set():return
@@ -130,6 +138,7 @@ class ReverseTunnel:
         except (OSError,EOFError) as e:
             if not self.stopped.is_set():self.log('Tunnel connection failed: '+str(e))
         finally:
+            self.slots.release()
             channel.close()
             if local:local.close()
             if pair:

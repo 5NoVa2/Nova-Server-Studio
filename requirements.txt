@@ -1,2 +1,2 @@
 PySide6==6.12.0
-paramiko>=3.5,<5
+# SSH uses app/ssh-requirements.txt with --require-hashes on first use.
