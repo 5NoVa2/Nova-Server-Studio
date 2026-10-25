@@ -8,7 +8,7 @@ ScrollView {
     property var topics: []
     property string topicsSignature: ''
     onSnapshotChanged: { const value=JSON.stringify(snapshot.helpTopics || []); if(value!==topicsSignature) { topicsSignature=value; topics=snapshot.helpTopics || [] } }
-    property var matches: topics.filter(row=>(!category || category.currentIndex===0 || row.category===category.currentText) && (row.title+' '+row.body+' '+row.category).toLowerCase().includes((search ? search.text : '').toLowerCase().trim()))
+    property var matches: topics.filter(row=>(!category || category.currentIndex===0 || row.category===category.currentText) && (row.title+' '+row.body+' '+row.category+' '+JSON.stringify(row.steps || [])).toLowerCase().includes((search ? search.text : '').toLowerCase().trim()))
     contentWidth: availableWidth; clip: true
     ColumnLayout { width: help.availableWidth-52; x: 26; spacing: 16
         Text { text: 'Let’s get you connected.'; color: '#f0f1f7'; font.pixelSize: 29; font.weight: Font.DemiBold; Layout.fillWidth: true }
@@ -24,6 +24,7 @@ ScrollView {
                 ColumnLayout { id: topicColumn; anchors.fill: parent; anchors.margins: 16; spacing: 12
                     NButton { objectName: 'helpTopicToggle_'+topic.modelData.id; text: topic.modelData.title+(topic.expanded ? '   −' : '   +'); Layout.fillWidth: true; onClicked: { topic.expanded=!topic.expanded; if(ApplicationWindow.window.uiSounds) ApplicationWindow.window.uiSounds.play('transition') } }
                     Text { visible: topic.expanded; text: topic.modelData.body; color: '#afbbce'; font.pixelSize: 13; wrapMode: Text.WordWrap; textFormat: Text.PlainText; Layout.fillWidth: true }
+                    SSHSetupGuide { visible: topic.expanded && !!topic.modelData.steps; steps: topic.modelData.steps || []; Layout.fillWidth: true }
                 }
             }
         }

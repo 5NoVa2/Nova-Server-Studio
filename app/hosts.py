@@ -342,6 +342,10 @@ class HostManager(QObject):
     def browse(self,key):self.active.browse(key)
     @Slot(str)
     def command(self,text):self.active.command(text)
+    @Slot(str)
+    def copyHelpCommand(self,text):
+        self.app.clipboard().setText(text)
+
     @Slot(str,result=bool)
     def setJoinAddress(self,value):return self.active.setJoinAddress(value)
     @Slot(str,str)

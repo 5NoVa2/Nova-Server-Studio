@@ -1,13 +1,6 @@
-# Saturn Server Launcher 1.0.0-beta.18
+# Saturn Server Launcher 1.0.1
 
-Created by Nova. Free under MIT.
+- Bug fixes and consistent Saturn branding.
+- First-time VPS & SSH setup support with step-by-step instructions, copyable commands, failed-login troubleshooting and local/public port checks.
 
-- Saturn branding throughout install/uninstall prompts, app messages and release downloads.
-- GitHub repository renamed Saturn-Server-Launcher.
-- Help section with 14 searchable, expandable troubleshooting topics covering VPS/SSH, ports, connection refused, DNS, Cloudflare and app issues.
-- Join-address editor stays in Settings → Domain & display; DNS instructions begin “At your domain panel…”.
-- Saved domains refresh the displayed join address without changing DNS at your provider.
-
-Exit Saturn from the tray before installing SaturnSetup.exe over your existing installation. Profiles, worlds and preferences are preserved. Older builds need this manual installer once because release assets now use Saturn names. Future updates use the new repository and installer name.
-
-The installer is unsigned; Windows may show an unknown-publisher warning. Requires 64-bit Windows 10+ and Python 3.10+ with pip, Tcl/Tk and the Python launcher.
+Exit Saturn from the tray before installing over your existing location. Profiles, worlds and saved settings are preserved.

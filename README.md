@@ -1,7 +1,7 @@
 # Saturn Server Launcher
 
 Free, open-source Minecraft server management for Windows. **Created by Nova.**
-Current public beta: **1.0.0-beta.18**.
+Current release: **1.0.1**.
 
 Run Minecraft on your own Windows PC. Optionally connect it through your own
 VPS so friends can join without router port forwarding, using the VPS address
@@ -28,7 +28,7 @@ network must allow the outbound tunnel. This does not guarantee anonymity.
 4. First launch downloads Qt if needed. Existing profiles, server folders,
    encrypted API keys and preferences are retained.
 
-This is an unsigned beta. Native Windows audio, live CurseForge downloads,
+This release is unsigned. Native Windows audio, live CurseForge downloads,
 multiplayer and long-running hosting still need wider testing.
 
 ## Create and host a server

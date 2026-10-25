@@ -1,5 +1,126 @@
 """In-app troubleshooting from real setup issues. No account-specific defaults."""
 TOPICS=[
+ {'id': 'ssh-startup',
+ 'category': 'VPS & SSH',
+ 'title': 'First-time VPS & SSH setup — commands, failed logins and listening ports',
+ 'body': 'Start here for a fresh Ubuntu 24.04 VPS. Follow the numbered steps in order; each command says where to run it. '
+         'Commands are copied only, never executed by Saturn. Examples use placeholders and sample ports, not your saved '
+         'credentials.',
+ 'steps': [{'title': '1. Open your provider’s web console',
+            'where': 'VPS · Ubuntu terminal',
+            'text': 'Use your VPS provider’s browser console (for example, RackNerd’s console) and log into the VPS account. '
+                    'These examples use root and SSH port 22; replace root, VPS_IP and every port with your own values. For the '
+                    'key-install commands, be logged in as the same account you will use for SSH. A non-root account needs sudo; '
+                    'Configure VPS in Saturn needs root or passwordless sudo. Keep this console open while testing.',
+            'command': 'whoami',
+            'expected': 'Shows the account you are setting up. Password prompts may show no characters while typing.',
+            'failure': 'If the console login fails, check the provider’s initial credentials or recovery options. The '
+                       'web-console login is separate from SSH authentication.'},
+           {'title': '2. Check or install the SSH server',
+            'where': 'VPS · Ubuntu terminal',
+            'text': 'Most VPS images already include SSH. Check it first. Ubuntu 24.04 may use ssh.socket, so an inactive '
+                    'ssh.service alone does not prove SSH is unavailable.',
+            'command': "sudo systemctl status ssh.service ssh.socket --no-pager\nsudo ss -lntp 'sport = :22'",
+            'expected': 'A LISTEN row on your SSH port; sshd or systemd can own the listener. Replace 22 if your provider uses '
+                        'another SSH port.',
+            'failure': 'If OpenSSH is missing or there is no listener, run the repair commands below from the provider console. '
+                       'If a listener exists but the PC cannot connect, check the VPS IP, SSH port and provider firewall.',
+            'repair': 'sudo apt update\n'
+                      'sudo apt install openssh-server\n'
+                      'sudo /usr/sbin/sshd -t && sudo systemctl enable --now ssh.service\n'
+                      'sudo journalctl -u ssh.service -u ssh.socket -n 50 --no-pager'},
+           {'title': '3. Create a key on your hosting PC',
+            'where': 'THIS PC · Windows PowerShell',
+            'text': 'Use a dedicated filename to avoid replacing an existing key. If this filename already exists, reuse it or '
+                    'choose a new filename; do not overwrite a key you still need. Enter a passphrase when asked. A passphrase '
+                    'protects the private key and is different from the VPS account password.',
+            'command': 'ssh-keygen -t ed25519 -f "$env:USERPROFILE\\.ssh\\saturn_ed25519"\n'
+                       'Get-Content "$env:USERPROFILE\\.ssh\\saturn_ed25519.pub"',
+            'expected': 'Two files: saturn_ed25519 is PRIVATE and stays on your PC; saturn_ed25519.pub is PUBLIC and is the line '
+                        'to copy to the VPS.',
+            'failure': 'If ssh-keygen is not recognized, install Windows OpenSSH Client through Windows Optional Features. Never '
+                       'share the private key or paste its contents into the VPS.'},
+           {'title': '4. Install the public key on the VPS',
+            'where': 'VPS · Ubuntu terminal · logged in as the SSH account',
+            'text': 'Run these commands as the account you checked with whoami. In nano, paste the entire public line starting '
+                    'ssh-ed25519 on its own new line. Keep any existing keys. Press Ctrl+O, Enter to save, then Ctrl+X to exit. '
+                    'Run chmod after closing nano.',
+            'command': 'mkdir -p ~/.ssh\nchmod 700 ~/.ssh\nnano ~/.ssh/authorized_keys\nchmod 600 ~/.ssh/authorized_keys',
+            'expected': 'Your public key is in that account’s authorized_keys. Installing a key does not normally require an SSH '
+                        'restart.',
+            'failure': 'Permission denied (publickey): check the username, private key selected on the PC, full public-key line '
+                       'and account ownership. Do not enable root password login to work around a key mismatch. Use the '
+                       'diagnostics below; configuration includes or Match blocks can affect the result.',
+            'repair': 'ls -ld ~ ~/.ssh ~/.ssh/authorized_keys\n'
+                      'sudo /usr/sbin/sshd -t\n'
+                      'sudo /usr/sbin/sshd -T | grep -E '
+                      '"^(port|pubkeyauthentication|authorizedkeysfile|permitrootlogin|passwordauthentication) "\n'
+                      'sudo journalctl -u ssh.service -n 50 --no-pager'},
+           {'title': '5. Verify the VPS identity and test SSH',
+            'where': 'VPS console, then THIS PC · Windows PowerShell',
+            'text': 'In the trusted VPS console, inspect the host fingerprint with the first command. Then run the ssh command '
+                    'on your PC. Compare the offered fingerprint before accepting; use the matching host-key type if the prompt '
+                    'shows RSA or ECDSA instead. known_hosts remembers the VPS identity; it is not your private key.',
+            'command': 'sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub',
+            'pcCommand': 'ssh -i "$env:USERPROFILE\\.ssh\\saturn_ed25519" -p 22 root@VPS_IP',
+            'expected': 'A successful SSH session opens a terminal on the VPS. The key passphrase unlocks the local key; an '
+                        'account password prompt is a different credential.',
+            'failure': 'Permission denied, please try again: verify the account/password in the provider console; a working '
+                       'console password may still be disabled for SSH. publickey: return to step 4. Timeout/refused: return to '
+                       'step 2 and check provider firewall TCP 22. A changed fingerprint must be verified through the provider '
+                       'console before updating known_hosts. For detailed connection errors, use the diagnostic command below '
+                       'and redact addresses/paths before sharing logs.',
+            'repair': 'ssh -v -i "$env:USERPROFILE\\.ssh\\saturn_ed25519" -p 22 root@VPS_IP'},
+           {'title': '6. Connect Saturn and start the tunnel',
+            'where': 'SATURN · Settings, then Server',
+            'text': 'In Settings → VPS connection, enter the VPS IP, SSH username, SSH port and the PRIVATE key path (no .pub). '
+                    'Enter its passphrase if needed. Test SSH connection, then stop any existing tunnel and choose Configure '
+                    'VPS. Select the profile’s Java or Bedrock tunnel, start the Minecraft server and connect its tunnel. Wait '
+                    'for the game startup-complete message. SSH reachable/authenticated is not a game connection test.',
+            'expected': 'Saturn logs the selected PUBLIC VPS port forwarding to this PC’s LOCAL port. Note both ports before the '
+                        'checks below.',
+            'failure': 'If Configure VPS fails, check the exact log and root/passwordless-sudo requirement. If forwarding fails, '
+                       'check for a duplicate public port, stop the other tunnel or choose an unused port, then run Configure '
+                       'VPS again.'},
+           {'title': '7. Is the game listening locally?',
+            'where': 'THIS PC · Windows PowerShell',
+            'text': 'Examples below use LOCAL Java TCP 25565 and LOCAL Bedrock UDP 19132. Replace them with this profile’s LOCAL '
+                    'ports. Run the matching check after Minecraft finishes starting.',
+            'command': 'Get-NetTCPConnection -State Listen -LocalPort 25565\nGet-NetUDPEndpoint -LocalPort 19132',
+            'expected': 'Java: a Listen row on the local TCP port. Bedrock: a UDP endpoint row (UDP has no TCP-style LISTEN '
+                        'state). You only need the check for the engine you are hosting.',
+            'failure': 'No matching objects/rows usually means no local listener on that port. Check the game console for '
+                       'startup errors and verify server.properties and the selected profile’s local port. Test joining locally '
+                       'before checking the public VPS port.'},
+           {'title': '8. Is the public game port listening on the VPS?',
+            'where': 'VPS · Ubuntu terminal',
+            'text': 'Examples below use PUBLIC Java TCP 25566 and PUBLIC Bedrock UDP 19132. Replace them with this profile’s '
+                    'PUBLIC ports. These game listeners exist only while the corresponding Saturn tunnel/relay is running. They '
+                    'are separate from SSH port 22.',
+            'command': "sudo ss -lntp 'sport = :25566'\nsudo ss -lnup 'sport = :19132'\nsudo ufw status verbose",
+            'expected': 'Java: LISTEN on 0.0.0.0:25566 or the configured public interface. Bedrock: a bound UDP endpoint, often '
+                        'UNCONN, on the public UDP port. A listener bound only to 127.0.0.1 is not publicly reachable. UFW '
+                        'inactive does not mean the provider firewall is open.',
+            'failure': 'No row: reconnect the matching tunnel/relay and check its log. Loopback-only Java listener: stop the '
+                       'tunnel, run Configure VPS and reconnect. Port already in use: identify the listed process before '
+                       'changing profiles; do not kill unrelated processes. A listener is necessary but does not prove firewall '
+                       'or game connectivity. If UFW is active, allow the matching public game port with the commands below. '
+                       'Also allow SSH and these game ports in the provider firewall; do not enable UFW blindly during '
+                       'troubleshooting.',
+            'repair': 'sudo ufw allow 25566/tcp\nsudo ufw allow 19132/udp'},
+           {'title': '9. Test the path before DNS',
+            'where': 'THIS PC · Windows PowerShell, then Minecraft',
+            'text': 'Java only: test the VPS IP and PUBLIC TCP port from the PC. Then join with the matching Minecraft client '
+                    'and required mods. Once the IP works, test the domain. Bedrock: use a real Bedrock client with the VPS IP '
+                    'and PUBLIC UDP port; Test-NetConnection is a TCP test and cannot verify UDP.',
+            'command': 'Test-NetConnection -ComputerName VPS_IP -Port 25566',
+            'expected': 'TcpTestSucceeded : True confirms a TCP connection to the public listener. It does not confirm Minecraft '
+                        'login, correct mods, or that the tunnel can reach the local server.',
+            'failure': 'False with a VPS listener present: check public binding, VPS/provider firewalls and the address/port. '
+                       'True but Minecraft fails: check the tunnel destination, local server readiness, protocol/version/mods. '
+                       'If VPS IP works but domain fails, check the A record, stale AAAA records and DNS-only mode. At your '
+                       'domain panel, point the join hostname to the VPS IP; enter the same domain in Settings → Domain & '
+                       'display.'}]},
  {'id':'first-connection','category':'Connections','title':'Start here: local works, but friends cannot join','body':
  '1. Start the selected server and wait for Ready or the server’s normal startup-complete message.\n'
  '2. From the hosting PC, test 127.0.0.1 with this profile’s LOCAL game port. From another device on the same LAN, use the hosting PC’s LAN IP.\n'
