@@ -7,6 +7,8 @@ from process_manager import check_cancelled
 
 VERSION='1.0.3'
 PRIVATE_BUILD=False
+# Populate only from a publisher certificate verified outside GitHub releases.
+TRUSTED_PUBLISHER_THUMBPRINTS=()
 REPO='5NoVa2/Saturn-Server-Launcher'
 API=f'https://api.github.com/repos/{REPO}/releases?per_page=100'
 
@@ -86,11 +88,20 @@ def download_update(release,cache):
 
 def launch_after_exit(path,expected,pid=None):
     if os.name!='nt':raise ValueError('Automatic installation is supported on Windows only.')
+    if not TRUSTED_PUBLISHER_THUMBPRINTS:
+        raise ValueError('Automatic installation is disabled until a trusted publisher signing certificate is configured.')
+    if any(not re.fullmatch(r'[A-Fa-f0-9]{40}',value) for value in TRUSTED_PUBLISHER_THUMBPRINTS):
+        raise ValueError('Invalid trusted publisher configuration.')
     path=Path(path).resolve()
+    if not re.fullmatch(r'[a-f0-9]{64}',expected):raise ValueError('Invalid installer checksum.')
     if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise ValueError('Installer changed. Download it again.')
     quoted=str(path).replace("'","''");pid=int(pid or os.getpid())
     # This helper is deliberately outside Saturn's owned server-process registry.
     # Wait for Saturn to exit, recheck the bytes, then open the standard installer.
-    script=f"$ErrorActionPreference='Stop'; $p=Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p) {{ if (-not $p.WaitForExit(60000)) {{ exit 1 }} }}; if ((Get-FileHash -LiteralPath '{quoted}' -Algorithm SHA256).Hash.ToLower() -ne '{expected}') {{ exit 2 }}; Start-Process -FilePath '{quoted}'"
+    publishers=','.join("'"+value.upper()+"'" for value in TRUSTED_PUBLISHER_THUMBPRINTS)
+    script=f"$ErrorActionPreference='Stop'; $p=Get-Process -Id {pid} -ErrorAction SilentlyContinue; if ($p) {{ if (-not $p.WaitForExit(60000)) {{ exit 1 }} }}; if ((Get-FileHash -LiteralPath '{quoted}' -Algorithm SHA256).Hash.ToLower() -ne '{expected}') {{ exit 2 }}; $sig=Get-AuthenticodeSignature -LiteralPath '{quoted}'; if ($sig.Status -ne 'Valid' -or $null -eq $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -notin @({publishers})) {{ exit 3 }}; Start-Process -FilePath '{quoted}'"
     powershell=Path(os.environ['SystemRoot'])/'System32'/'WindowsPowerShell'/'v1.0'/'powershell.exe'
+    verify=f"$ErrorActionPreference='Stop'; $sig=Get-AuthenticodeSignature -LiteralPath '{quoted}'; if ($sig.Status -ne 'Valid' -or $null -eq $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -notin @({publishers})) {{ exit 3 }}"
+    result=subprocess.run([str(powershell),'-NoProfile','-NonInteractive','-Command',verify],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    if result.returncode:raise ValueError('Installer publisher signature is missing, invalid, or untrusted. Installation blocked.')
     return subprocess.Popen([str(powershell),'-NoProfile','-NonInteractive','-WindowStyle','Hidden','-Command',script],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,close_fds=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))

@@ -1,0 +1,92 @@
+name: Build installer for SignPath
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: signpath-installer
+  cancel-in-progress: false
+jobs:
+  installer:
+    # Only main may request production signing. No PR or arbitrary ref inputs.
+    if: github.ref == 'refs/heads/main' && github.repository == '5NoVa2/Saturn-Server-Launcher'
+    runs-on: windows-2022
+    environment: signpath-production
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install NSIS build tool
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+      - name: Compile and verify unsigned installer
+        shell: pwsh
+        run: |
+          python -m compileall -q app
+          if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed' }
+          python installer/build_verified_installer.py --makensis 'C:\Program Files (x86)\NSIS\makensis.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
+      - name: Upload unsigned build for provenance verification
+        id: unsigned
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Saturn-unsigned-installer
+          path: dist/SaturnSetup.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check signing configuration
+        if: vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        env:
+          ORGANIZATION: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          ARTIFACT: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          foreach ($name in @('ORGANIZATION','PROJECT','POLICY','ARTIFACT','TOKEN')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Missing SignPath setting: $name" }
+          }
+      - name: Request signing and wait for manual SignPath approval
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: signed
+      - name: Verify signature and checksum signed bytes
+        if: vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        env:
+          EXPECTED_PUBLISHER: ${{ vars.SIGNPATH_CERTIFICATE_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EXPECTED_PUBLISHER -notmatch '^[a-fA-F0-9]{40}$') { throw 'Configure the independently verified signing certificate thumbprint' }
+          $file = 'signed/SaturnSetup.exe'
+          $sig = Get-AuthenticodeSignature -LiteralPath $file
+          if ($sig.Status -ne 'Valid' -or $null -eq $sig.SignerCertificate -or $sig.SignerCertificate.Thumbprint -ne $env:EXPECTED_PUBLISHER) { throw 'Unexpected or invalid installer signature' }
+          $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower()
+          Set-Content -LiteralPath signed/SHA256SUMS.txt -Value "$hash  SaturnSetup.exe" -Encoding ascii
+      - name: Retain signed installer for release review
+        if: vars.SIGNPATH_ENABLED == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Saturn-signed-installer
+          path: |
+            signed/SaturnSetup.exe
+            signed/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
