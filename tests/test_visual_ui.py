@@ -165,7 +165,7 @@ class VisualUITests(unittest.TestCase):
   intro=self.load();intro.finish();self.window.setProperty('page',7);QTest.qWait(30)
   help_page=self.window.findChild(QObject,'helpPage');search=help_page.findChild(QObject,'helpSearch')
   self.assertIsNone(help_page.findChild(QObject,'helpJoinAddressField'))
-  search.setProperty('text','publickey');QTest.qWait(30)
+  search.setProperty('text','The VPS did not accept a usable key');QTest.qWait(30)
   matches=help_page.property('matches');matches=matches.toVariant() if hasattr(matches,'toVariant') else matches
   self.assertEqual([row['id'] for row in matches],['publickey'])
   def items(item):
@@ -176,6 +176,24 @@ class VisualUITests(unittest.TestCase):
   self.assertTrue(topic.property('expanded'))
   search.setProperty('text','no-such-help-topic');QTest.qWait(20)
   self.assertEqual(help_page.findChild(QObject,'helpResultCount').property('text'),'0 help topics')
+ def test_ssh_guide_commands_copy_without_running_and_survive_refresh(self):
+  from PySide6.QtCore import QPointF,Qt
+  intro=self.load();intro.finish();self.window.setHeight(1800);self.window.setProperty('page',7);QTest.qWait(50)
+  page=self.window.findChild(QObject,'helpPage');page.findChild(QObject,'helpSearch').setProperty('text','First-time VPS');QTest.qWait(30)
+  def items(item):
+   yield item
+   for child in item.childItems():yield from items(child)
+  topic=next(item for item in items(self.window.contentItem()) if item.objectName()=='helpTopic_ssh-startup')
+  topic.setProperty('expanded',True);QTest.qWait(80)
+  button=next(item for item in items(topic) if item.objectName()=='copyHelpCommand_0_main')
+  point=button.mapToScene(QPointF(button.width()/2,button.height()/2)).toPoint()
+  with patch.object(self.manager.active,'task') as task:
+   QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point);QTest.qWait(20)
+   self.assertEqual(app.clipboard().text(),'whoami');self.assertEqual(button.property('text'),'Copied');task.assert_not_called()
+  self.manager.active.publish(activity='Status refresh');QTest.qWait(300);self.assertTrue(topic.property('expanded'))
+  page.findChild(QObject,'helpSearch').setProperty('text','ss -lnup');QTest.qWait(30)
+  matches=page.property('matches');matches=matches.toVariant() if hasattr(matches,'toVariant') else matches
+  self.assertEqual([row['id'] for row in matches],['ssh-startup'])
  def test_settings_domain_editor_save_validation_and_profile_isolation(self):
   from settings_store import SettingsStore
   self.manager.active.update('vps_host','203.0.113.20');self.manager.active.update('remote_java_port',25566)

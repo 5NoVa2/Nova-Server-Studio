@@ -1,3 +1,10 @@
+# Saturn Server Launcher 1.0.0-beta.19 — SSH guide preview
+
+- One first-time VPS & SSH setup section with nine numbered steps.
+- Copyable commands labelled for Ubuntu or Windows, expected results and fixes after failures.
+- SSH key setup, identity verification, Saturn connection setup, local/public TCP and UDP listener checks, firewalls and DNS diagnosis.
+- Commands copy to the clipboard only; Saturn does not execute help commands.
+
 # Saturn Server Launcher 1.0.0-beta.18
 
 Created by Nova. Free under MIT.
