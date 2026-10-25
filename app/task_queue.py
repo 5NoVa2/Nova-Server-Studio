@@ -47,7 +47,7 @@ class HostTaskQueue(QObject):
     self.restore_tunnel=session.active(session.tunnel);self.phase_to('stopping',120);session.stop()
    else:self.phase_to('saving',120);session.world_saved.clear();session.command('save-all flush')
   else:
-   self.restore_tunnel=bool(session.s.get('vps_host'));self.phase_to('starting');session.action('start')
+   self.restore_tunnel=bool(session.s.get('use_vps',True) and session.s.get('vps_host'));self.phase_to('starting');session.action('start')
  def schedule(self):
   try:
    ready,changed=self.schedules.due(paused=self.paused)

@@ -124,7 +124,9 @@ class Properties:
         if self.bedrock:
             locked['server-port']=str(port(self.network.get('local_bedrock_port',19132)))
             locked['server-portv6']=str(port(self.network.get('bedrock_ipv6_port',19133)))
-        else:locked['server-port']=str(port(self.network.get('local_java_port',25565)))
+        else:
+            locked['server-port']=str(port(self.network.get('local_java_port',25565)))
+            locked['server-ip']='127.0.0.1' if self.network.get('use_vps',True) else ''
         updates.update(locked)
         output=[];seen=set()
         for raw,line in self.iter_records():

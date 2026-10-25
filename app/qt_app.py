@@ -100,8 +100,10 @@ class Bridge(QObject):
             if key=='apiKey':self.api_save_timer.start(800)
             return
         if key=='editor':self.publish(editor=str(value),dirty=str(value)!=getattr(self,'original_text',''));return
-        if key in ('folder','engine','java_version','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
+        if key in ('folder','engine','java_version','use_vps','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
             self.error('Stop hosting and finish current work before changing server type, folder or ports.');return
+        if key=='use_vps' and not isinstance(value,bool):
+            self.error('Use VPS tunnel must be on or off.');return
         if key=='java_version' and value not in ('Auto','8','11','17','21','25'):
             self.error('Choose a listed Java version.');return
         if key=='folder':
@@ -118,6 +120,7 @@ class Bridge(QObject):
             self.publish(**{key:value})
             if key in self.store.data:self.save()
             if key=='folder':self.refresh_files()
+            if key=='use_vps':self.publish(joinDisplay=self.join_display())
     @Slot(str,result=bool)
     def setJoinAddress(self,value):
         if self.s['exiting']:return False
@@ -125,16 +128,17 @@ class Bridge(QObject):
             from connection_settings import host
             normalized=host(value) if value.strip() else ''
         except (ValueError,UnicodeError) as error:self.error(error);return False
-        previous=self.s['join_address'];self.s['join_address']=normalized
+        key='join_address' if self.s.get('use_vps',True) else 'direct_join_address'
+        previous=self.s[key];self.s[key]=normalized
         if not self.save():
-            self.publish(join_address=previous);return False
+            self.publish(**{key:previous});return False
         self.publish(joinDisplay=self.join_display(),error='')
         self.changed.emit()
         return True
     @Slot(str,str)
     def draft(self,key,value):
         if key in self.store.data and not self.s['exiting']:
-            if key in ('folder','engine','java_version','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
+            if key in ('folder','engine','java_version','use_vps','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
             if key=='folder':self.folder_editing=True
             self.s[key]=value
     def save(self):
@@ -143,7 +147,11 @@ class Bridge(QObject):
             from port_ranges import RANGE_KEYS,normalize
             for key in RANGE_KEYS:data[key]=normalize(data[key])
             from connection_settings import port
-            for key in ('local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port'):data[key]=port(data[key])
+            for key in ('local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port','direct_java_port','direct_bedrock_port'):data[key]=port(data[key])
+            address=str(data.get('direct_join_address','')).strip()
+            if address:
+                from connection_settings import host
+                data['direct_join_address']=host(address)
             self.store.save(data);return True
         except Exception as e:self.error(e);return False
     def task(self,label,fn,done=None):
@@ -200,8 +208,11 @@ class Bridge(QObject):
             if name=='save':self.save();return
             if name=='save_all':self.save_all();return
             if name=='copy':
-                self.app.clipboard().setText((self.s['join_address'] or self.s['vps_host'] or 'localhost') if self.tunnel_kind()=='Bedrock' else self.join_display())
-                self.log('Join address copied.'+(' Bedrock port: '+str(self.s['remote_bedrock_port']) if self.tunnel_kind()=='Bedrock' else ''));return
+                if not self.s.get('use_vps',True) and not self.s.get('direct_join_address'):
+                    raise ValueError('Enter your public IP or domain in Settings → Domain & display before copying the public join address.')
+                address=self.join_host() if self.tunnel_kind()=='Bedrock' else self.join_display()
+                self.app.clipboard().setText(address)
+                self.log('Join address copied.'+(' Bedrock port: '+str(self.join_port()) if self.tunnel_kind()=='Bedrock' else ''));return
             if name=='ensure_versions':
                 if getattr(self,'versions_engine',None)==self.s['engine'] or self.s['busy']:return
                 name='versions'
@@ -248,13 +259,17 @@ class Bridge(QObject):
             if name in ('start','hosting'):
                 if self.s['busy'] or self.s['exiting']:return
                 self.start_server()
+                if not self.s.get('use_vps',True):
+                    self.pending=False
+                    self.log('Direct hosting started. Forward the public game port on your router to this PC’s LAN IP and local game port. No VPS tunnel is used.');return
                 if name=='hosting' and not self.s['vps_host']:
-                    self.log('Local hosting started. Add your own VPS in Settings for public tunnel access.');return
+                    self.log('Local hosting started. Configure a VPS, or uncheck Use VPS tunnel for LAN / router port forwarding.');return
                 if name=='hosting' and self.active(self.server):self.pending=True;self.deadline=time.monotonic()+300
                 return
             if name=='tunnel':self.connect_tunnel();return
             if name=='stop':self.stop();return
             if name=='configure':
+                if not self.s.get('use_vps',True):raise ValueError('Use VPS tunnel is off. Configure your router for direct hosting instead.')
                 if self.active(self.tunnel):raise ValueError('Stop the tunnel before configuring your VPS.')
                 c=Connection.parse(self.s);creds=self.credentials()
                 from host_ports import vps_script
@@ -345,6 +360,7 @@ class Bridge(QObject):
             self.server.stdin.write(text.lstrip('/')+'\n');self.server.stdin.flush()
         except Exception as e:self.error(e)
     def connect_tunnel(self):
+        if not self.s.get('use_vps',True):raise ValueError('Use VPS tunnel is off for this profile.')
         if self.s['busy'] or self.active(self.tunnel):return
         if not self.active(self.server):raise ValueError('Start the server first.')
         c=Connection.parse(self.s);creds=self.credentials();bedrock=self.tunnel_kind()=='Bedrock';generation=self.generation
@@ -385,14 +401,21 @@ class Bridge(QObject):
             elif self.ready.is_set():self.pending=False;self.action('tunnel')
             elif time.monotonic()>self.deadline:self.pending=False;self.error('Readiness was not detected. Review the console before connecting the tunnel.')
     def tunnel_kind(self):
-        choice=self.s.get('tunnel_type','Auto')
+        choice=self.s.get('tunnel_type','Auto') if self.s.get('use_vps',True) else 'Auto'
         if choice!='Auto':return choice
         engine=self.running_engine if self.active(self.server) else self.s.get('installedEngine') or self.s['engine']
         return 'Bedrock' if engine=='Bedrock' else 'Java'
+    def join_host(self):
+        if not self.s.get('use_vps',True):return self.s.get('direct_join_address','')
+        return self.s['join_address'] or self.s['vps_host'] or 'localhost'
+    def join_port(self):
+        kind='bedrock_port' if self.tunnel_kind()=='Bedrock' else 'java_port'
+        prefix='direct_' if not self.s.get('use_vps',True) else ('remote_' if self.s['vps_host'] else 'local_')
+        return int(self.s[prefix+kind])
     def join_display(self):
-        bedrock=self.tunnel_kind()=='Bedrock'
-        address=self.s['join_address'] or self.s['vps_host'] or 'localhost'
-        try:port=int(self.s[('remote_' if self.s['vps_host'] else 'local_')+('bedrock_port' if bedrock else 'java_port')])
+        bedrock=self.tunnel_kind()=='Bedrock';address=self.join_host()
+        if not address:return 'Set direct join address in Settings'
+        try:port=self.join_port()
         except (ValueError,TypeError):return address+' (enter a valid game port)'
         if bedrock:return address+' : '+str(port)+' (Bedrock UDP)'
         if ':' in address:address='['+address+']'
@@ -404,6 +427,7 @@ class Bridge(QObject):
         original=path.read_bytes();state=json.loads(original)
         keys=('local_java_port','local_bedrock_port','bedrock_ipv6_port')
         network={k:port(self.s[k]) for k in keys}
+        network['use_vps']=self.s.get('use_vps',True)
         if network['local_bedrock_port']==network['bedrock_ipv6_port']:raise ValueError('Bedrock IPv4 and IPv6 ports must be different.')
         if state.get('nova_ports')!=network:
             state['nova_ports']=network

@@ -52,7 +52,7 @@ class HostManager(QObject):
     def state(self):
         from updater import VERSION,PRIVATE_BUILD
         values=dict(self.active.s);values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
-        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
+        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else ('Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel']))),tunnel=('Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel'])) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values.update(taskCreateError=self.task_create_error,schedules=[dict(row,label=__import__('task_queue').LABELS[row['operation']]) for row in self.queue.schedules.rows],scheduleTimezone='PC local time ('+time.strftime('%Z')+')',tasks=[dict(row) for row in self.queue.rows],queueRunning=self.queue.running or self.queue.current is not None,queuePaused=self.queue.paused)
         values['busy']=self.active.s['busy'] or self.exiting or bool(self.queue.current and self.queue.current['profile']==self.active.profile_id);values['exiting']=self.exiting
         if self.exiting:values['activity']='Saving all worlds and closing…'
@@ -116,16 +116,20 @@ class HostManager(QObject):
             bedrock=next(p for p in range(19132,65535,2) if p not in used_bedrock and p+1 not in used_bedrock)
             from port_ranges import parse_ranges,assign_remote
             peers=[s for s in self.sessions.values() if s.s['vps_host']==self.active.s['vps_host']]
-            remote_java=assign_remote(parse_ranges(self.active.s['java_port_ranges']),{int(s.s['remote_java_port']) for s in peers},java)
-            remote_bedrock=assign_remote(parse_ranges(self.active.s['bedrock_port_ranges']),{int(s.s['remote_bedrock_port']) for s in peers},bedrock)
+            remote_java=assign_remote(parse_ranges(self.active.s['java_port_ranges']) if self.active.s.get('use_vps',True) else [],{int(s.s['remote_java_port']) for s in peers},java)
+            remote_bedrock=assign_remote(parse_ranges(self.active.s['bedrock_port_ranges']) if self.active.s.get('use_vps',True) else [],{int(s.s['remote_bedrock_port']) for s in peers},bedrock)
+            used_direct_java={int(s.s['direct_java_port']) for s in self.sessions.values()}
+            used_direct_bedrock={int(s.s['direct_bedrock_port']) for s in self.sessions.values()}
+            direct_java=next(p for p in range(java,65536) if p not in used_direct_java)
+            direct_bedrock=next(p for p in range(bedrock,65536) if p not in used_direct_bedrock)
             from server_locations import new_server_folder
             for existing in self.sessions.values():
                 path=Path(existing.s['folder']).expanduser().resolve()
                 if self.servers_root==path or path in self.servers_root.parents:raise ValueError('Choose a main servers folder outside existing server folders in Settings.')
             destination=new_server_folder(self.servers_root,name,[s.s['folder'] for s in self.sessions.values()])
             session=self.bridge_class(self.app,identifier,self)
-            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):session.s[key]=self.active.s[key]
-            session.s.update(folder=str(destination),local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
+            for key in ('use_vps','direct_join_address','vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):session.s[key]=self.active.s[key]
+            session.s.update(folder=str(destination),direct_java_port=direct_java,direct_bedrock_port=direct_bedrock,local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
             session.secrets['apiKey']=self.apiKey
             if not session.save():
                 session.timer.stop()
@@ -190,7 +194,7 @@ class HostManager(QObject):
             otherfolder=Path(other.s['folder']).expanduser().resolve()
             if folder==otherfolder or folder in otherfolder.parents or otherfolder in folder.parents:raise ValueError('Another active profile is using this folder. Stop it before changing files.')
     def vps_ports(self,connection):
-        peers=[s for s in self.sessions.values() if s.s['vps_host'] and Connection.parse(s.s).vps_host==connection.vps_host and s.s['ssh_username']==connection.ssh_username]
+        peers=[s for s in self.sessions.values() if s.s.get('use_vps',True) and s.s['vps_host'] and Connection.parse(s.s).vps_host==connection.vps_host and s.s['ssh_username']==connection.ssh_username]
         from port_ranges import parse_ranges
         java={int(s.s['remote_java_port']) for s in peers};bedrock={int(s.s['remote_bedrock_port']) for s in peers}
         for session in peers:
