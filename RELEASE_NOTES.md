@@ -1,3 +1,22 @@
+# Nova Server Studio 1.0.0-beta.4
+
+Created by Nova. Free and open source under MIT.
+
+## New in this update
+- Settings > Nova updates: Check for updates, Download update, Install update.
+- Public beta and stable release discovery from the official GitHub repository.
+- SHA-256 verified downloads; installs require confirmation and all hosting stopped.
+- Nova saves settings/edits and exits before its standard installer opens. Install over the existing location to preserve profiles, worlds, backups and saved API keys.
+- Includes beta.2/beta.3 improvements: faster download UI, Save All / Ctrl+S, core-only file editor, version dropdown loading, manual backup restore, VPS port ranges and unused-port assignment for new profiles.
+
+## Upgrade
+Download NovaSetup.exe below. Exit your old Nova from the tray, then install over the existing location. This first installation is manual; future published releases can be downloaded from the new update controls.
+
+## Requirements and limits
+Windows 10/11 x64 with 64-bit Python 3.10+ including pip, Tk and the Python launcher. First launch downloads Qt. Bring your own CurseForge API key and optional VPS. Unsigned beta installer. No automatic installation or scheduled backups. Sleep-on-join is not included.
+
+Validation: 30 automated checks passed, including UI rendering, real sshd range validation, update version ordering, checksum rejection, corrupt-download cleanup and blocking updates during any active host. Native Windows installer handoff and live multiplayer need testing.
+
 # Nova Server Studio 1.0.0-beta.3
 
 - Settings > VPS port ranges accepts inclusive ranges and comma-separated ports.

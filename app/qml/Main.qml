@@ -342,6 +342,20 @@ ApplicationWindow {
                 ScrollView { id: settingsScroll; contentWidth: availableWidth; clip: true
                     ColumnLayout { width: settingsScroll.availableWidth-52; x: 26; spacing: 16
                         Heading { text: 'Make yourself at home.' }
+                        Panel { Layout.fillWidth: true; implicitHeight: updateColumn.implicitHeight+40
+                            ColumnLayout { id: updateColumn; anchors.fill: parent; anchors.margins: 20; spacing: 12
+                                Caption { text: 'NOVA UPDATES · '+s.appVersion }
+                                Body { text: s.updateStatus || ''; Layout.fillWidth: true }
+                                RowLayout {
+                                    Action { objectName: 'checkUpdatesButton'; text: 'Check for updates'; enabled: !s.updateBusy && !s.exiting; onClicked: nova.action('check_updates') }
+                                    Action { text: 'Download update'; visible: !!s.updateAvailable && !s.updateReady; enabled: !s.updateBusy && !s.exiting; onClicked: nova.action('download_update') }
+                                    Action { text: 'Install update'; visible: !!s.updateReady; primary: true; enabled: !s.updateBusy && !s.exiting; onClicked: nova.action('install_update') }
+                                }
+                                Body { text: 'Checks include public beta releases. Downloads are verified against the release SHA-256 checksum. Stop all servers and tunnels before installing. Updates never install automatically.'; Layout.fillWidth: true }
+                                Body { visible: !!s.updateAvailable; text: s.updateNotes || ''; textFormat: Text.PlainText; Layout.fillWidth: true; maximumLineCount: 12; elide: Text.ElideRight }
+                            }
+                        }
+
                         Body { text: 'Connection preferences save automatically. Passwords and passphrases stay in memory. CurseForge keys save encrypted for your Windows account.'; Layout.fillWidth: true }
                         Panel { Layout.fillWidth: true; implicitHeight: storageColumn.implicitHeight+40
                             ColumnLayout { id: storageColumn; anchors.fill: parent; anchors.margins: 20; spacing: 12

@@ -2,7 +2,7 @@
 
 Free, open-source Minecraft server management for Windows. Created by **Nova**.
 
-**First public beta: 1.0.0-beta.3.** Local hosting, multiple independent server
+**First public beta: 1.0.0-beta.4.** Local hosting, multiple independent server
 profiles, and optional reverse SSH hosting through a VPS—all in one window.
 
 ## Features
@@ -146,3 +146,14 @@ choose an unused public port. Existing assigned profile ports stay included.
 Blank ranges preserve the existing per-profile behavior. Range permissions are
 combined across profiles with the same VPS/SSH user; change inherited ranges in
 those profiles too if shrinking the permitted set. Old UFW allowances remain.
+
+## App updates
+
+Settings > Nova updates > Check for updates reads public releases from this
+repository, including betas. Download update verifies the installer against the
+release SHA256SUMS.txt. Stop all servers and tunnels, then choose Install update
+and confirm. Nova saves preferences/edits and closes; a hidden Windows helper waits
+for Nova to exit, rechecks the installer hash, and opens standard setup. Install
+over the existing location to retain profiles, worlds, backups and remembered keys.
+No updates install automatically. This verifies release-file integrity; the
+installer remains unsigned. Internet access to GitHub and its asset CDN is needed.

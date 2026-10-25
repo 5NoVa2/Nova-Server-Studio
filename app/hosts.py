@@ -33,6 +33,7 @@ class HostManager(QObject):
                     backup=self.path.with_name('profiles.corrupt-'+uuid.uuid4().hex[:8]+'.json');self.path.rename(backup)
                     self.warning+=' The unreadable registry was preserved at '+str(backup)
             except OSError:pass
+        self.update_info=None;self.update_download=None;self.update_busy=False;self.update_status='Check GitHub for a newer release.'
         self.sessions={}
         for entry in self.entries:
             session=bridge_class(app,entry['id'],self);self.sessions[entry['id']]=session
@@ -46,7 +47,8 @@ class HostManager(QObject):
     def s(self):return self.active.s
     @Property('QVariantMap',notify=changed)
     def state(self):
-        values=dict(self.active.s);values['serversRoot']=str(self.servers_root)
+        from updater import VERSION
+        values=dict(self.active.s);values.update(appVersion=VERSION,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
         values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values['busy']=self.active.s['busy'] or self.exiting;values['exiting']=self.exiting
         if self.exiting:values['activity']='Saving all worlds and closing…'
@@ -193,10 +195,61 @@ class HostManager(QObject):
     def restoreBackup(self,path):self.active.restoreBackup(path)
     @Slot(str)
     def action(self,name):
+        if name in ('check_updates','download_update','install_update'):
+            self.update_action(name);return
         if name=='exit':self.exit();return
         if name=='tray':self.minimize();return
         if name=='stop_all':self.stopAll();return
         self.active.action(name)
+    def update_task(self,label,work,done):
+        if self.update_busy or self.exiting:return
+        self.update_busy=True;self.update_status=label;self.changed.emit()
+        from process_manager import start_worker
+        def run():
+            try:
+                result=work()
+                def complete():
+                    self.update_busy=False
+                    if not self.exiting:done(result);self.changed.emit()
+                self.posted.emit(complete)
+            except Exception as error:
+                message=str(error)
+                def failed():
+                    self.update_busy=False;self.update_status='Update failed: '+message;self.changed.emit()
+                self.posted.emit(failed)
+        start_worker(run)
+    def updates_idle(self):
+        if self.exiting or self.update_busy:raise ValueError('Wait for the update operation to finish.')
+        for session in self.sessions.values():
+            if session.s['busy'] or session.pending or session.active(session.server) or session.active(session.tunnel):
+                raise ValueError('Stop all servers and tunnels and finish current work before installing an update.')
+    def update_action(self,name):
+        try:
+            from updater import check_updates,download_update,launch_after_exit
+            if name=='check_updates':
+                def checked(info):
+                    self.update_info=info;self.update_download=None
+                    self.update_status=('Available: '+info['version']) if info else 'You are up to date.'
+                self.update_task('Checking GitHub releases…',check_updates,checked)
+            elif name=='download_update':
+                if not self.update_info:raise ValueError('Check for an update first.')
+                info=dict(self.update_info)
+                def downloaded(result):self.update_download=result;self.update_status='Verified update ready. Stop all hosting, then install.'
+                self.update_task('Downloading and verifying update…',lambda:download_update(info,self.cache),downloaded)
+            elif name=='install_update':
+                self.updates_idle()
+                if not self.update_download:raise ValueError('Download and verify the update first.')
+                def install(yes):
+                    if not yes:return
+                    self.updates_idle()
+                    for session in self.sessions.values():
+                        if session.s['dirty'] or session.s['propertyDirty']:session.save_all()
+                        elif not session.save():raise ValueError('Could not save preferences before updating.')
+                    launch_after_exit(*self.update_download)
+                    self._exit()
+                self.active.confirm('Install Nova update?', 'Nova will save your settings and close. The verified installer will open after Nova exits. Install over the existing location to keep profiles, worlds and your saved API key.',install)
+        except Exception as error:
+            self.update_status=str(error);self.changed.emit()
     @Slot(str,'QVariant')
     def update(self,key,value):
         if key=='apiKey':
