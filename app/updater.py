@@ -5,7 +5,8 @@ from urllib.parse import urlparse
 from urllib.request import Request,urlopen
 from process_manager import check_cancelled
 
-VERSION='1.0.0-beta.6'
+VERSION='1.0.0-beta.17'
+PRIVATE_BUILD=False
 REPO='5NoVa2/Nova-Server-Studio'
 API=f'https://api.github.com/repos/{REPO}/releases?per_page=100'
 

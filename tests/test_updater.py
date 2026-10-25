@@ -10,6 +10,8 @@ def release(tag,**values):
  row.update(values);return row
 
 class UpdaterTests(unittest.TestCase):
+ def setUp(self):
+  override=patch.object(updater,'PRIVATE_BUILD',False);override.start();self.addCleanup(override.stop)
  def test_release_order_handles_betas_and_stable(self):
   self.assertGreater(updater.version_key('1.0.0'),updater.version_key('1.0.0-beta.99'))
   rows=[release('v1.0.0-beta.10'),release('v1.0.0-beta.3'),release('v1.0.0-beta.20',draft=True)]

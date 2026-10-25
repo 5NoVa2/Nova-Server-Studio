@@ -1,4 +1,4 @@
-"""Windowless bootstrap; one Nova window at a time."""
+"""Windowless bootstrap; one Saturn window at a time."""
 import os, sys, traceback, threading, queue, tempfile, shutil
 from pathlib import Path
 from qt_runtime import activate_runtime, configure_rendering
@@ -7,7 +7,7 @@ folder=Path(os.environ.get('LOCALAPPDATA',str(Path.home()/'.cache')))/'MCServerS
 folder.mkdir(parents=True,exist_ok=True)
 log=(folder/'app.log').open('a',encoding='utf-8',buffering=1)
 sys.stdout=log;sys.stderr=log
-print('Nova 1.0.0-beta.6 startup: '+str(Path(__file__).resolve()))
+print('Saturn 1.0.0-beta.17 startup: '+str(Path(__file__).resolve()))
 print('Python: '+sys.executable+' | Qt renderer: '+os.environ.get('QT_QUICK_BACKEND',''))
 qt=folder/'qt-libs';activate_runtime(qt)
 
@@ -32,9 +32,9 @@ def bootstrap():
     except ImportError:pass
     import tkinter as tk
     from tkinter import ttk
-    root=tk.Tk();root.title('Nova | Preparing interface');root.geometry('540x230');root.resizable(False,False)
+    root=tk.Tk();root.title('Saturn | Preparing interface');root.geometry('540x230');root.resizable(False,False)
     root.configure(bg='#11141c')
-    tk.Label(root,text='N O V A',font=('Segoe UI',25,'bold'),bg='#11141c',fg='#eeeeef').pack(pady=(24,8))
+    tk.Label(root,text='S A T U R N',font=('Segoe UI',25,'bold'),bg='#11141c',fg='#eeeeef').pack(pady=(24,8))
     label=tk.Label(root,text='Preparing the new interface…\nFirst launch downloads Qt. This can take a few minutes.',font=('Segoe UI',11),bg='#11141c',fg='#a9b6cb');label.pack(pady=10)
     bar=ttk.Progressbar(root,mode='indeterminate');bar.pack(fill='x',padx=30,pady=12);bar.start()
     events=queue.Queue();result=[False];closing=[False]
@@ -59,7 +59,7 @@ def bootstrap():
         except queue.Empty:root.after(150,poll);return
         bar.stop()
         if value is None:result[0]=True;root.destroy()
-        else:label.configure(text=value+'\nClose Nova, then launch it again to retry.',wraplength=480)
+        else:label.configure(text=value+'\nClose Saturn, then launch it again to retry.',wraplength=480)
     threading.Thread(target=work,daemon=True).start();root.after(150,poll);root.mainloop()
     if result[0] and not closing[0]:
         activate_runtime(qt)
@@ -78,7 +78,7 @@ except Exception:
     traceback.print_exc()
     import tkinter as tk
     from tkinter import ttk
-    root=tk.Tk();root.title('Nova | Startup error');root.geometry('700x210')
-    ttk.Label(root,text='Nova could not start',font=('Segoe UI',20,'bold')).pack(pady=25)
+    root=tk.Tk();root.title('Saturn | Startup error');root.geometry('700x210')
+    ttk.Label(root,text='Saturn could not start',font=('Segoe UI',20,'bold')).pack(pady=25)
     ttk.Label(root,text='Error details: '+str(folder/'app.log'),wraplength=650).pack(padx=20)
     root.mainloop()

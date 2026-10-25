@@ -2,6 +2,10 @@ import QtQuick
 import QtQuick.Controls
 ComboBox {
     id: c
+    property var soundBus: ApplicationWindow.window ? ApplicationWindow.window.uiSounds : null
+    hoverEnabled: true
+    onHoveredChanged: if(hovered && enabled && soundBus) soundBus.play('hover')
+    Connections { target: c; function onActivated() { if(c.enabled && c.soundBus) c.soundBus.play('click') } }
     property var choices: []
     property string choicesSignature: ''
     model: []

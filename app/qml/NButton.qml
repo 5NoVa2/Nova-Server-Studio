@@ -2,12 +2,15 @@ import QtQuick
 import QtQuick.Controls
 Button {
     id: b
+    property var soundBus: ApplicationWindow.window ? ApplicationWindow.window.uiSounds : null
+    hoverEnabled: true
+    onHoveredChanged: if(hovered && enabled && soundBus) soundBus.play('hover')
+    Connections { target: b; function onClicked() { if(b.enabled && b.soundBus) b.soundBus.play('click') } }
     property bool primary: false
     property bool danger: false
     property bool motion: true
     implicitHeight: 44
     implicitWidth: Math.max(100, label.implicitWidth+32)
-    hoverEnabled: true
     font.pixelSize: 13
     font.weight: Font.DemiBold
     opacity: enabled ? 1 : 0.4

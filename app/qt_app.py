@@ -22,8 +22,10 @@ class Bridge(QObject):
     def __init__(self, app, profile_id="main", owner=None):
         super().__init__(); self.app=app; self.window=None;self.owner=owner;self.profile_id=profile_id
         self.store=SettingsStore(CACHE/'settings.json' if profile_id=='main' else CACHE/'profiles'/profile_id/'settings.json');self.store.data.setdefault('reduced',False)
-        self.s=dict(self.store.data, busy=False, activity='Ready', error='', logs='', server='Stopped', tunnel='Disconnected', uptime='—', versions=['latest'], packs=[], releases=[], mods=[], project={}, releaseIndex=0, pageIndex=0, files=[], backups=[], addons=[], editor='', file='', dirty=False, properties={}, dialog='', dialogTitle='', exiting=False, reduced=bool(self.store.data.get('reduced',False)))
+        self.s=dict(self.store.data, busy=False, activity='Ready', error='', logs='', server='Stopped', tunnel='Disconnected', uptime='—', versions=['latest'], packs=[], releases=[], mods=[], project={}, releaseIndex=0, pageIndex=0, browserRows=[],browserPath='',browserRoot='',files=[], backups=[], addons=[], editor='', file='', dirty=False, properties={}, dialog='', dialogTitle='', exiting=False, reduced=bool(self.store.data.get('reduced',False)))
         self.s.update(players=[],agreed=False,propertyDirty=False,filesLoaded=False,installedEngine='',joinDisplay=self.s['join_address'])
+        from server_stats import ServerStats
+        self.stats=ServerStats();self.s.update(cpuLoad=None,ramBytes=None)
         self.log_lock=threading.Lock();self.log_pending=[]
         self.properties_original={};self.last_files_scan=0;self.last_player_poll=0;self.loaded_folder=None;self.folder_editing=False
         from players import PlayerTracker
@@ -37,6 +39,7 @@ class Bridge(QObject):
             if remembered:self.secrets['apiKey']=remembered
         except Exception:
             self.api_warning='Could not unlock the saved CurseForge key. Re-enter it to save it for this Windows account.'
+        self.world_saved=threading.Event()
         self.server=None; self.tunnel=None; self.ready=threading.Event(); self.pending=False; self.running_engine='Vanilla'; self.started=0; self.generation=0
         self.confirmation=None; self.editor_meta=None; self.editor_files=None; self.properties_doc=None; self.tray=None
         self.posted.connect(self.deliver,Qt.ConnectionType.QueuedConnection)
@@ -75,6 +78,7 @@ class Bridge(QObject):
         if any(self.s.get(k)!=v for k,v in values.items()):
             self.s.update(values);self.changed.emit()
     def log(self,message):
+        if 'saved the game' in str(message).lower() or 'saved the world' in str(message).lower():self.world_saved.set()
         with self.log_lock:self.log_pending.append(str(message))
     def flush_logs(self):
         with self.log_lock:
@@ -94,8 +98,10 @@ class Bridge(QObject):
             if key=='apiKey':self.api_save_timer.start(800)
             return
         if key=='editor':self.publish(editor=str(value),dirty=str(value)!=getattr(self,'original_text',''));return
-        if key in ('folder','engine','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
+        if key in ('folder','engine','java_version','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
             self.error('Stop hosting and finish current work before changing server type, folder or ports.');return
+        if key=='java_version' and value not in ('Auto','8','11','17','21','25'):
+            self.error('Choose a listed Java version.');return
         if key=='folder':
             self.folder_editing=False
             if not str(value).strip():self.error('Choose a server folder.');return
@@ -113,7 +119,7 @@ class Bridge(QObject):
     @Slot(str,str)
     def draft(self,key,value):
         if key in self.store.data and not self.s['exiting']:
-            if key in ('folder','engine','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
+            if key in ('folder','engine','java_version','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
             if key=='folder':self.folder_editing=True
             self.s[key]=value
     def save(self):
@@ -218,6 +224,12 @@ class Bridge(QObject):
             if name=='downloads':
                 paths=sorted((Path.home()/'Downloads').glob('*.zip'),key=lambda p:p.stat().st_mtime,reverse=True)
                 self.publish(downloads=[str(p) for p in paths]);return
+            if name=='prepare_java':
+                self.stopped()
+                version=self.s.get('java_version','Auto')
+                if version=='Auto':raise ValueError('Choose a Java version first.')
+                from runtime import get_java
+                self.task('Preparing Java '+version+'…',lambda:get_java(int(version),self.log),lambda path:self.log('Java ready: '+str(path)));return
             if name in ('start','hosting'):
                 if self.s['busy'] or self.s['exiting']:return
                 self.start_server()
@@ -291,6 +303,11 @@ class Bridge(QObject):
         if engine=='Bedrock':command=[str(folder/'bedrock_server.exe')]
         else:
             java=Path(state['java']).resolve();ram=int(self.s['ram'])
+            selected=self.s.get('java_version','Auto')
+            if selected!='Auto':
+                matches=list((CACHE/'runtime'/selected).glob('*/bin/java.exe'))
+                if len(matches)!=1:raise ValueError('Prepare Java '+selected+' in Settings → Environment before starting this server.')
+                java=matches[0].resolve()
             if CACHE.resolve() not in java.parents or java.name.lower()!='java.exe':raise ValueError('Unexpected Java path. Reinstall the selected server.')
             if not 2<=ram<=16:raise ValueError('RAM must be 2–16 GB.')
             args=state.get('args',['-jar','server.jar','nogui'])
@@ -339,6 +356,7 @@ class Bridge(QObject):
     def tick(self):
         self.flush_logs()
         running=self.active(self.server);tunnel=self.active(self.tunnel)
+        self.publish(**self.stats.sample(self.server))
         elapsed=int(time.monotonic()-self.started) if running else 0
         self.publish(joinDisplay=self.join_display(),server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel='Connected' if tunnel else 'Disconnected',uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
         if not running and self.s['players']:self.publish(players=[])
@@ -387,7 +405,7 @@ class Bridge(QObject):
             if not (Path(self.s['folder'])/'server.properties').is_file():
                 if self.loaded_folder!=self.s['folder']:
                     self.loaded_folder=self.s['folder'];self.properties_doc=None;self.editor_meta=None;self.editor_files=None
-                    self.publish(files=[],addons=[],properties={},editor='',file='',dirty=False,propertyDirty=False,filesLoaded=False,installedEngine='')
+                    self.publish(browserRows=[],browserPath='',browserRoot='',files=[],addons=[],properties={},editor='',file='',dirty=False,propertyDirty=False,filesLoaded=False,installedEngine='')
                 return
             if self.loaded_folder!=self.s['folder']:
                 self.editor_meta=None;self.editor_files=None
@@ -399,6 +417,9 @@ class Bridge(QObject):
     def load_files(self,preserve=False):
         from server_files import ServerFiles,Properties
         files=ServerFiles(self.s['folder']);self.loaded_folder=self.s['folder']
+        if self.s['browserRoot']!=str(files.root):
+            from file_browser import FileBrowser
+            self.publish(browserRows=FileBrowser(files.root).listing(),browserPath='',browserRoot=str(files.root))
         values=dict(files=files.config_files(),addons=[{'kind':k,'name':n} for k in ('mods','plugins') for n in files.addons(k)],filesLoaded=True,installedEngine=files.state.get('engine',self.s['engine']))
         if not preserve or not self.s['propertyDirty']:
             self.properties_doc=Properties(files.root/'server.properties');self.properties_original=dict(self.properties_doc.values)
@@ -408,6 +429,13 @@ class Bridge(QObject):
             name=self.s['file'] or ('server.properties' if 'server.properties' in values['files'] else '')
             if name in values['files']:self._open_file(name)
     @Slot(str)
+    def browseFiles(self,relative):
+        try:
+            from file_browser import FileBrowser
+            target=self.s['folder'];browser=FileBrowser(target)
+            self.task('Loading folder…',lambda:browser.listing(relative),lambda rows:self.publish(browserRows=rows,browserPath=relative,browserRoot=str(browser.root)) if self.s['folder']==target else None)
+        except Exception as error:self.error(error)
+    @Slot(str)
     def open_file(self,name):
         try:
             if self.s['dirty']:
@@ -415,8 +443,8 @@ class Bridge(QObject):
             else:self._open_file(name)
         except Exception as e:self.error(e)
     def _open_file(self,name):
-        from server_files import ServerFiles
-        files=ServerFiles(self.s['folder']);text,checksum,encoding=files.read_config(name)
+        from file_browser import FileBrowser
+        files=FileBrowser(self.s['folder']);text,checksum,encoding=files.read_text(name)
         self.editor_meta=(checksum,encoding);self.editor_files=files;self.original_text=text
         self.publish(file=name,editor=text,dirty=False)
     def write_file(self):
@@ -424,7 +452,7 @@ class Bridge(QObject):
         if self.s['busy']:raise ValueError('Wait for current work to finish.')
         if not self.editor_meta:raise ValueError('Open a configuration file first.')
         if self.editor_files.root!=Path(self.s['folder']).expanduser().resolve():raise ValueError('Server folder changed. Reload the file first.')
-        name=self.s['file'];self.editor_files.write_config(name,self.s['editor'],*self.editor_meta);self._open_file(name);self.log('Saved '+name)
+        name=self.s['file'];self.editor_files.write_text(name,self.s['editor'],*self.editor_meta);self._open_file(name);self.log('Saved '+name)
     @Slot(str,str)
     def property_value(self,key,value):
         props=dict(self.s['properties']);props[key]=value;self.publish(properties=props,propertyDirty=props!=self.properties_original)
@@ -535,12 +563,11 @@ class Bridge(QObject):
     def pick(self):
         project=self.s['project'];release=self.s['releases'][self.s['releaseIndex']]
         if not release.get('serverPackFileId'):raise ValueError('Choose a release with Server: Yes.')
-        selection=dict(artwork=(project.get('logo') or {}).get('thumbnailUrl',''),project_id=project['id'],file_id=release['id'],name=project['name'],release=release.get('displayName',release['fileName']))
+        selection=dict(artwork=(project.get('logo') or {}).get('thumbnailUrl',''),project_id=project['id'],file_id=release['id'],name=project['name'],release=release.get('displayName') or release.get('fileName') or ('Release '+str(release['id'])))
         self.publish(cf_pack=selection,engine='CurseForge');self.save();self.log('Selected '+selection['name']+' / '+selection['release'])
     def setup_tray(self):
-        pix=QPixmap(64,64);pix.fill(QColor('#17191f'));p=QPainter(pix);p.setPen(QColor('#eeeeef'));p.setFont(QFont('Segoe UI',35,QFont.Weight.Bold));p.drawText(pix.rect(),Qt.AlignmentFlag.AlignCenter,'N');p.end()
-        self.app.setWindowIcon(QIcon(pix));self.tray=QSystemTrayIcon(QIcon(pix),self.app);self.tray.setToolTip('Nova Server Studio')
-        self.menu=QMenu();self.menu.addAction('Open Nova',self.restore);self.menu.addSeparator();self.menu.addAction('Exit Nova • stop hosting',self.exit)
+        icon=QIcon(str(BASE/'Nova.ico'));self.app.setWindowIcon(icon);self.tray=QSystemTrayIcon(icon,self.app);self.tray.setToolTip('Saturn Server Launcher')
+        self.menu=QMenu();self.menu.addAction('Open Saturn',self.restore);self.menu.addSeparator();self.menu.addAction('Exit Saturn • stop hosting',self.exit)
         self.tray.setContextMenu(self.menu);self.tray.activated.connect(lambda reason:self.restore() if reason in (QSystemTrayIcon.ActivationReason.Trigger,QSystemTrayIcon.ActivationReason.DoubleClick) else None);self.tray.show()
     def restore(self):self.window.showNormal();self.window.raise_();self.window.requestActivate()
     def minimize(self):
@@ -568,7 +595,7 @@ class Bridge(QObject):
 
 def main():
     os.environ.setdefault('QT_QUICK_CONTROLS_STYLE','Basic')
-    app=QApplication(sys.argv);app.setApplicationName('Nova');app.setQuitOnLastWindowClosed(False)
+    app=QApplication(sys.argv);app.setApplicationName('Saturn Server Launcher');app.setQuitOnLastWindowClosed(False)
     from hosts import HostManager
     bridge=HostManager(app,Bridge);engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('nova',bridge)
     engine.load(QUrl.fromLocalFile(str(BASE/'qml'/'Main.qml')))

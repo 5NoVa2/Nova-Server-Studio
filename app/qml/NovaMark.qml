@@ -15,7 +15,6 @@ Canvas {
         let sphere=c.createLinearGradient(85,48,158,130)
         sphere.addColorStop(0,'#e5e9ef'); sphere.addColorStop(0.3,'#788594'); sphere.addColorStop(0.7,'#232b34'); sphere.addColorStop(1,'#0b1017')
         c.beginPath(); c.arc(120,86,42,0,Math.PI*2); c.fillStyle=sphere; c.fill(); c.strokeStyle='#86929f'; c.lineWidth=1; c.stroke()
-        c.beginPath(); c.moveTo(106,104); c.lineTo(106,69); c.lineTo(134,104); c.lineTo(134,69); c.lineWidth=3; c.lineCap='round'; c.lineJoin='round'; c.strokeStyle='#f6f8fc'; c.stroke()
         c.save(); c.translate(120,90); c.rotate(-0.34); c.scale(1,0.31)
         c.beginPath(); c.arc(0,0,96,0,Math.PI); c.strokeStyle='#c8d0da'; c.lineWidth=2; c.stroke(); c.restore()
     }

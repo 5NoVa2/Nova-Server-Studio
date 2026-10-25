@@ -4,6 +4,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot,Qt
 from PySide6.QtWidgets import QSystemTrayIcon,QFileDialog
 from connection_settings import Connection
+from updater import PRIVATE_BUILD
 
 class HostManager(QObject):
     changed=Signal();apiKeyChanged=Signal();credentialsChanged=Signal();storageChanged=Signal();posted=Signal(object)
@@ -33,13 +34,15 @@ class HostManager(QObject):
                     backup=self.path.with_name('profiles.corrupt-'+uuid.uuid4().hex[:8]+'.json');self.path.rename(backup)
                     self.warning+=' The unreadable registry was preserved at '+str(backup)
             except OSError:pass
-        self.update_info=None;self.update_download=None;self.update_busy=False;self.update_status='Check GitHub for a newer release.'
+        self.task_create_error='';self.update_info=None;self.update_download=None;self.update_busy=False;self.update_status='Private build · public updates disabled.' if PRIVATE_BUILD else 'Check for a newer public release.'
         self.sessions={}
         for entry in self.entries:
             session=bridge_class(app,entry['id'],self);self.sessions[entry['id']]=session
             session.changed.connect(self.changed.emit)
             session.apiKeyChanged.connect(self.apiKeyChanged.emit)
         self.posted.connect(lambda fn:fn(),Qt.ConnectionType.QueuedConnection)
+        from task_queue import HostTaskQueue
+        self.queue=HostTaskQueue(self)
         if self.warning:self.active.log(self.warning)
     @property
     def active(self):return self.sessions[self.entries[self.current]['id']]
@@ -47,10 +50,11 @@ class HostManager(QObject):
     def s(self):return self.active.s
     @Property('QVariantMap',notify=changed)
     def state(self):
-        from updater import VERSION
-        values=dict(self.active.s);values.update(appVersion=VERSION,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
+        from updater import VERSION,PRIVATE_BUILD
+        values=dict(self.active.s);values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
         values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
-        values['busy']=self.active.s['busy'] or self.exiting;values['exiting']=self.exiting
+        values.update(taskCreateError=self.task_create_error,schedules=[dict(row,label=__import__('task_queue').LABELS[row['operation']]) for row in self.queue.schedules.rows],scheduleTimezone='PC local time ('+time.strftime('%Z')+')',tasks=[dict(row) for row in self.queue.rows],queueRunning=self.queue.running or self.queue.current is not None,queuePaused=self.queue.paused)
+        values['busy']=self.active.s['busy'] or self.exiting or bool(self.queue.current and self.queue.current['profile']==self.active.profile_id);values['exiting']=self.exiting
         if self.exiting:values['activity']='Saving all worlds and closing…'
         return values
     @Property(str,notify=apiKeyChanged)
@@ -120,7 +124,7 @@ class HostManager(QObject):
                 if self.servers_root==path or path in self.servers_root.parents:raise ValueError('Choose a main servers folder outside existing server folders in Settings.')
             destination=new_server_folder(self.servers_root,name,[s.s['folder'] for s in self.sessions.values()])
             session=self.bridge_class(self.app,identifier,self)
-            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','reduced'):session.s[key]=self.active.s[key]
+            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):session.s[key]=self.active.s[key]
             session.s.update(folder=str(destination),local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
             session.secrets['apiKey']=self.apiKey
             if not session.save():
@@ -149,6 +153,7 @@ class HostManager(QObject):
     def removeProfile(self):
         try:
             self.editable_selection();session=self.active;session.stopped()
+            if self.queue.references(session.profile_id):raise ValueError('Remove this profile’s queued tasks before removing the profile.')
             if len(self.entries)==1:raise ValueError('Keep at least one server profile.')
             def remove(yes):
                 if not yes:return
@@ -192,14 +197,74 @@ class HostManager(QObject):
             java.update(parse_ranges(session.s['java_port_ranges']));bedrock.update(parse_ranges(session.s['bedrock_port_ranges']))
         return sorted(java),sorted(bedrock)
     @Slot(str)
+    def queueTask(self,operation):
+        try:self.queue.add(self.active.profile_id,operation)
+        except Exception as error:self.active.error(error)
+    @Slot(str,str,result=bool)
+    def runTask(self,operation,command):
+        try:
+            self.queue.add(self.active.profile_id,operation,command=command)
+            self.queue.paused=False;self.queue.running=True;self.task_create_error='';self.changed.emit();return True
+        except Exception as error:
+            self.task_create_error=str(error);self.changed.emit();return False
+    @Slot(str)
+    def queueCommand(self,command):
+        try:self.queue.add(self.active.profile_id,'command',command=command)
+        except Exception as error:self.active.error(error)
+    @Slot(str,str,str,str,str)
+    def scheduleTask(self,operation,date,clock,repeat,command):
+        try:
+            entry=self.entries[self.current]
+            self.queue.schedules.add(entry['id'],entry['name'],operation,date,clock,repeat,command=command)
+            self.changed.emit()
+        except Exception as error:self.active.error(error)
+    @Slot()
+    def beginTaskCreation(self):self.task_create_error='';self.changed.emit()
+    @Slot(int,int,str,str,result=str)
+    def previewTaskTime(self,hour,minute,meridiem,repeat):
+        try:
+            from schedules import anchor_from_time
+            anchor=anchor_from_time(hour,minute,meridiem,repeat)
+            return 'First run: '+anchor.strftime('%a, %b %d')+' at '+anchor.strftime('%I:%M %p').lstrip('0')+' · PC local time'
+        except Exception as error:return str(error)
+    @Slot(str,int,int,str,str,str,result=bool)
+    def createTimedTask(self,operation,hour,minute,meridiem,repeat,command):
+        try:
+            from schedules import anchor_from_time
+            anchor=anchor_from_time(hour,minute,meridiem,repeat);entry=self.entries[self.current]
+            self.queue.schedules.add(entry['id'],entry['name'],operation,anchor.strftime('%Y-%m-%d'),anchor.strftime('%H:%M'),repeat,command=command)
+            self.task_create_error='';self.changed.emit();return True
+        except Exception as error:
+            self.task_create_error=str(error);self.changed.emit();return False
+    @Slot(str,bool)
+    def enableSchedule(self,identifier,enabled):
+        try:self.queue.schedules.enable(identifier,enabled);self.changed.emit()
+        except Exception as error:self.active.error(error)
+    @Slot(str)
+    def removeSchedule(self,identifier):
+        try:self.queue.schedules.remove(identifier);self.changed.emit()
+        except Exception as error:self.active.error(error)
+    @Slot(str)
+    def removeTask(self,identifier):self.queue.remove(identifier)
+    @Slot(str)
+    def browseFiles(self,path):self.active.browseFiles(path)
+    @Slot(str)
     def restoreBackup(self,path):self.active.restoreBackup(path)
     @Slot(str)
     def action(self,name):
+        if name=='queue_run':self.queue.paused=False;self.queue.running=True;self.changed.emit();return
+        if name=='queue_pause':self.queue.paused=True;self.queue.running=False;self.changed.emit();return
+        if name=='queue_clear':
+            self.queue.rows=[r for r in self.queue.rows if r['status'] in ('Queued','Running')];self.changed.emit();return
         if name in ('check_updates','download_update','install_update'):
             self.update_action(name);return
         if name=='exit':self.exit();return
         if name=='tray':self.minimize();return
-        if name=='stop_all':self.stopAll();return
+        if name=='stop_all':
+            self.queue.running=False;self.queue.paused=True
+            if self.queue.current:
+                self.queue.current.update(status='Cancelled',detail='Stopped by Stop all.');self.queue.current=None
+            self.stopAll();self.changed.emit();return
         self.active.action(name)
     def update_task(self,label,work,done):
         if self.update_busy or self.exiting:return
@@ -225,7 +290,9 @@ class HostManager(QObject):
                 raise ValueError('Stop all servers and tunnels and finish current work before installing an update.')
     def update_action(self,name):
         try:
-            from updater import check_updates,download_update,launch_after_exit
+            from updater import check_updates,download_update,launch_after_exit,PRIVATE_BUILD
+            if PRIVATE_BUILD:
+                self.update_status='Private build · public updates disabled.';self.changed.emit();return
             if name=='check_updates':
                 def checked(info):
                     self.update_info=info;self.update_download=None
@@ -247,12 +314,12 @@ class HostManager(QObject):
                         elif not session.save():raise ValueError('Could not save preferences before updating.')
                     launch_after_exit(*self.update_download)
                     self._exit()
-                self.active.confirm('Install Nova update?', 'Nova will save your settings and close. The verified installer will open after Nova exits. Install over the existing location to keep profiles, worlds and your saved API key.',install)
+                self.active.confirm('Install Saturn update?', 'Saturn will save your settings and close. The verified installer will open after Saturn exits. Install over the existing location to keep profiles, worlds and your saved API key.',install)
         except Exception as error:
             self.update_status=str(error);self.changed.emit()
     @Slot(str,'QVariant')
     def update(self,key,value):
-        if key in ('startup_animation','reduced'):
+        if key in ('startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):
             for session in self.sessions.values():
                 if session is not self.active:session.update(key,value)
         if key=='apiKey':
@@ -307,6 +374,7 @@ class HostManager(QObject):
         if not all(s.save() for s in self.sessions.values()):return
         for session in self.sessions.values():
             if session.api_save_timer.isActive():session.saveApiKey()
+        self.queue.running=False;self.queue.timer.stop()
         self.exiting=True;self.restore();self.stopAll()
         for session in self.sessions.values():session.publish(exiting=True,activity='Saving all worlds and closing…')
         from process_manager import cancelled,stop_all,wait_workers

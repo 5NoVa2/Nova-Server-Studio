@@ -1,171 +1,138 @@
-# Nova Server Studio
+# Saturn Server Launcher
 
-Free, open-source Minecraft server management for Windows. Created by **Nova**.
+Free, open-source Minecraft server management for Windows. **Created by Nova.**
+Previously Nova Server Studio. Current public beta: **1.0.0-beta.17**.
 
-**First public beta: 1.0.0-beta.6.** Local hosting, multiple independent server
-profiles, and optional reverse SSH hosting through a VPS—all in one window.
+Run Minecraft on your own Windows PC. Optionally connect it through your own
+VPS so friends can join without router port forwarding, using the VPS address
+or your domain. The PC runs Minecraft; the VPS forwards network traffic.
+You provide the VPS separately. Your PC and internet must stay on, and the
+network must allow the outbound tunnel. This does not guarantee anonymity.
 
-## Features
+## What's new
 
-- Vanilla, Paper, Spigot, Forge, CurseForge server packs and native Bedrock.
-- Multiple simultaneous hosts with separate folders, ports, logs and settings.
-- One main servers folder; new profiles create named subfolders automatically.
-- Java TCP and Bedrock UDP tunnel selection and custom game ports.
-- Server properties editor, configuration files, mod/plugin management.
-- Console-based player list, kick, operator and allowlist controls; Java ban/pardon.
-- Manual backups, system tray hosting, full screen and reduced motion.
-- CurseForge pack search, release details, artwork and manifest mod lists.
-- Optional remembered CurseForge API key encrypted for your Windows account.
+- Saturn branding, Dashboard / Server / Files / Tasks / Players / Settings navigation.
+- Server modpack section and Prepare a world → Browse modpacks popup.
+- Single-click folder/file browser with in-app editing and Save All.
+- Saved Start, Stop, Save world, Backup and custom console-command schedules.
+- Collapsible Settings sections and per-profile Java selection/preparation.
+- Per-server CPU load and resident RAM on Windows, sampled every two seconds.
+- Particle startup scene, soft pings and tonal transitions; master mute and volume.
+- Public update checks restored, plus an isolated installer build with NSIS CRC validation.
 
-## Install
+## Install or upgrade
 
-1. Install **64-bit Python 3.10 or newer** from [python.org](https://www.python.org/downloads/windows/), including pip, Tcl/Tk and the Python launcher.
-2. Download `NovaSetup.exe` from this repository's **Releases** tab, once a release is published.
-3. Run setup, then open **Nova Server Studio** from your desktop.
-4. First launch downloads Qt if needed. Internet access is required for downloads.
+1. Install **64-bit Python 3.10+** with pip, Tcl/Tk and the Python launcher.
+2. Download **NovaSetup.exe** from Releases. The asset name is retained so older
+   Nova installations can discover the update. The installed app is Saturn.
+3. Exit Nova/Saturn from the tray, then run the installer over the existing location.
+4. First launch downloads Qt if needed. Existing profiles, server folders,
+   encrypted API keys and preferences are retained.
 
-The installer is currently unsigned. This is a beta release; test your setup
-before using it for a long-running public server.
+This is an unsigned beta. Native Windows audio, live CurseForge downloads,
+multiplayer and long-running hosting still need wider testing.
 
-## Create a server
+## Create and host a server
 
-1. In **Settings**, choose **Main servers folder** once.
-2. Type a profile name in the top bar and click **+ Add**.
-3. On **Server**, choose software/version, read and accept the Minecraft EULA,
-   then click **Install / switch**. The server folder is created automatically.
-4. Use **Start local** for local play. Connect from the same PC using `localhost`
-   and that profile's **local** game port.
+Choose Main servers folder in Settings. Add a named profile; Saturn creates a
+subfolder automatically. On Server, select the engine and Minecraft version,
+accept the EULA, and choose Install / switch. Installation replaces the selected
+server folder after confirmation; create a backup before replacing a world.
 
-Local hosting works without a VPS. No VPS, domain, password or API key is
-preconfigured in this public build. Existing preferences on an upgrading PC
-are retained.
+Supported engines: Vanilla, Paper, Spigot, Forge, CurseForge server packs and
+native Bedrock. CurseForge browsing requires your own approved API key. Not all
+modpack releases include dedicated server files. Some downloads are subject to
+publisher restrictions and upstream terms.
 
-**Installing/switching replaces all files in the selected server folder after
-confirmation. Backups are manual.** Stop the selected server before changing
-files or making a consistent backup. Click **Manual backup** to keep a copy.
+Start local works without a VPS. Connect using localhost and the profile's local
+port from the same PC, or its LAN address from another device on the same LAN.
+Each simultaneous server needs its own folder and ports. New profiles allocate
+unused ports; Settings supports additional VPS port ranges.
 
-## Optional public hosting through a VPS
+For public hosting, enter your own Ubuntu VPS host, SSH account/key and public
+join address in Settings. Configure VPS sets up forwarding and active UFW rules;
+root or passwordless sudo is required. Provider firewalls must allow the public
+game ports. Java uses reverse SSH TCP; Bedrock uses the app's UDP relay carried
+through SSH/TCP. The latter can add latency. Point an A record at your VPS and
+use DNS-only mode if applicable. A domain is optional.
 
-Supply your own Ubuntu **24.04** VPS and SSH credentials in Settings. Click
-**Configure VPS**, then **Start hosting**. New host fingerprints require trust
-confirmation; verify them with your VPS provider before accepting.
+Passwords/passphrases stay in memory. Private key files stay on your PC.
+The optional saved CurseForge key uses Windows account encryption. No shared
+API keys, credentials, VPS, domain or game content are included.
 
-Each simultaneous Java server needs a unique local TCP port. Each Bedrock
-server needs unique local IPv4/IPv6 UDP ports. Profiles sharing a VPS need
-unique public ports for their protocol. Nova assigns distinct defaults.
+## Files, players and backups
 
-After adding profiles or changing public ports, run **Configure VPS** again.
-It needs root or passwordless sudo and changes SSH forwarding permissions and
-active UFW game-port rules. Allow the same ports in provider firewalls too.
-Java join addresses need `:public-port` when using a non-default port.
-Bedrock clients enter the host and public UDP port separately.
+Files provides single-click folder navigation, a text editor, server properties,
+mods/plugins and backup restoration. Save All / Ctrl+S saves pending edits with
+conflict checks. Text files are size-limited; binary files cannot be edited.
 
-A domain is optional. If using one, point its A record at your VPS IPv4 address.
-No home-router port forwarding is required for this reverse-tunnel setup.
-Bedrock UDP is carried over SSH/TCP; packet loss can increase latency.
-Nova itself is free; VPS providers and other services may charge separately.
+Console-based player tracking supports kick, op/deop and allowlist operations;
+Java also supports ban/pardon. Some server/modded output formats may differ.
 
-## CurseForge
+Backups are explicit actions or saved tasks. A scheduled/running-server backup
+cleanly stops, copies the server folder, then restarts and reconnects its tunnel.
+A stopped server stays stopped. Backup or restart failures pause the queue and
+may leave the server stopped. Backups are not automatically pruned.
+Restoring a backup requires a stopped server and confirmation.
 
-Use your own approved CurseForge API key in **Modpacks**. Nova does not provide
-a shared key. Published server packs and author/API download permissions are
-required. Client mod lists can differ from server-pack contents.
-**Forget key** removes the remembered key. SSH passwords/passphrases remain in
-memory; private key files stay on your PC.
+## Tasks
 
-## Tray and multiple servers
+Schedule Start, Stop, Save world, Backup or a custom Minecraft console command.
+Dropdowns select the action, frequency, hour, minute and AM/PM. Frequencies are
+once, daily, weekdays, weekly, every two weeks and monthly. The first run is the
+next matching local time. Monthly tasks preserve the original day, using the
+last day of shorter months. Schedules persist; the immediate task queue is
+session-only. Saturn and the PC must be running. Missed runs are skipped.
+Errors pause the queue; Stop all cancels queued work and pauses schedules.
+Custom commands run in the game console, never an OS shell.
 
-Switching profiles keeps other hosts running. **Stop hosting** affects the
-selected profile; **Stop all** stops every host. Closing the window minimizes
-to the tray. Right-click the tray icon and choose **Exit Nova** to save and
-stop all servers. Remaining Nova-owned process trees are ended after the
-shutdown timeout; unrelated Java/Python processes are left alone.
+Java Save world sends save-all flush and waits for the standard English save
+message. Bedrock Save world uses a clean restart. Check server compatibility.
+Sleep-on-join is not implemented.
 
-Uninstall through Windows Installed apps. Server worlds, backups, profile
-preferences and cached runtimes are preserved.
+## Environment, interface and updates
 
-## Build from source
+Settings sections toggle open. Environment selects Auto or managed Java
+8/11/17/21/25 per profile. Auto uses the runtime selected during installation;
+prepare a manual choice before starting. Choose a Java version compatible with
+your Minecraft/mod loader. Bedrock does not use Java.
 
-```powershell
-python -m pip install -r requirements.txt
-python app/Launch.pyw
+Dashboard and Server show Windows server-process CPU load and resident RAM.
+CPU is normalized against total PC capacity. Samples refresh every two seconds;
+the first CPU value requires two readings. Unavailable/stopped metrics show a dash.
+
+Settings → Domain & display has a global Enable sounds switch and sound volume,
+separate startup sound control, startup scene preference, preview and Reduce motion.
+The intro is skippable. Closing minimizes to the tray; Exit Saturn saves and stops
+owned hosting processes. F11 toggles fullscreen.
+
+Settings → Saturn updates checks public GitHub releases, including betas.
+Downloads use SHA-256 verification. Installation is explicit and requires stopped
+servers/tunnels. Private previews have public updating disabled; install this public
+build manually to move from a private preview. No silent automatic installation.
+
+## Source and installer build
+
+Python dependencies are listed in requirements.txt. Run app/Launch.vbs on Windows
+for windowless launch, or app/Launch.pyw. Source uses Python, PySide6 Qt/QML and
+Paramiko. Original startup/UI sounds can be regenerated with the standard-library
+scripts under tools/.
+
+Build with NSIS installed:
+
+```sh
+python installer/build_verified_installer.py
 ```
 
-To build the Windows installer, install [NSIS 3](https://nsis.sourceforge.io/),
-then run:
+Use --makensis to specify the compiler. The helper rejects concurrent builds,
+compiles into an isolated path, verifies NSIS length and CRC, then atomically
+promotes dist/NovaSetup.exe. Build scripts never include profiles, worlds,
+credentials, downloaded runtimes or development logs in the installer.
 
-```powershell
-python installer/build_installer.py
-makensis installer/NovaSetup.nsi
+Run checks with:
+
+```sh
+python -m unittest discover -s tests -q
 ```
 
-The installer is written to `dist/NovaSetup.exe`. The source includes the
-installer generator and its generated script. Build in a clean workspace;
-never add local preferences, API keys, SSH keys, logs or server worlds.
-
-Tests use isolated temporary folders and include a public-build smoke check:
-
-```powershell
-python -m unittest discover -s tests -v
-```
-
-## Beta limitations and support
-
-- Windows 10/11 x64 is the target. Native Windows runtime and live remote play
-  need broader community testing; source-level/software-rendering checks are
-  not a guarantee on every PC or network.
-- Player lists parse standard English console messages. Custom/localized
-  servers may report players differently. Bedrock has no native ban/pardon.
-- Arbitrary imported server ZIPs may need their supplied launcher. Built-in
-  installers create Nova launch metadata.
-- Logs: `%LOCALAPPDATA%\MCServerSwitcher\app.log`. Remove IPs, usernames,
-  private paths and other personal data before sharing diagnostics publicly.
-- Report reproducible issues through this repository's Issues tab. Never post
-  passwords, private keys or API keys.
-
-## License
-
-Nova's code is licensed under [MIT](LICENSE). Dependencies, installer components
-and downloaded game/server files retain their own licenses and terms; see
-[third-party notices](THIRD_PARTY_NOTICES.md).
-
-Not an official Minecraft product. Not approved by or associated with Mojang
-or Microsoft. Minecraft is a trademark of its respective owners.
-
-See RELEASE_NOTES.md for the beta.2 save, performance, version-selector and backup restore changes.
-
-## VPS port ranges
-
-In Settings, enter a Java TCP range such as `25565-25575` and optionally a
-Bedrock UDP range such as `19132-19142`. Comma-separated ports/ranges also work.
-Save preferences, then run Configure VPS. This updates SSH forwarding permissions
-and an active UFW firewall. Open the same ranges in any provider firewall.
-
-Each server still uses one public game port. New profiles inherit the ranges and
-choose an unused public port. Existing assigned profile ports stay included.
-Blank ranges preserve the existing per-profile behavior. Range permissions are
-combined across profiles with the same VPS/SSH user; change inherited ranges in
-those profiles too if shrinking the permitted set. Old UFW allowances remain.
-
-## App updates
-
-Settings > Nova updates > Check for updates reads public releases from this
-repository, including betas. Download update verifies the installer against the
-release SHA256SUMS.txt. Stop all servers and tunnels, then choose Install update
-and confirm. Nova saves preferences/edits and closes; a hidden Windows helper waits
-for Nova to exit, rechecks the installer hash, and opens standard setup. Install
-over the existing location to retain profiles, worlds, backups and remembered keys.
-No updates install automatically. This verifies release-file integrity; the
-installer remains unsigned. Internet access to GitHub and its asset CDN is needed.
-
-## Silver orbital interface
-
-The dashboard has a selected-server hero, server cards with live status/player
-counts and shortcuts. Click a card to select that profile in the large dashboard panel. Quick controls stay on the dashboard; Server setup opens the full Server tab.
-New CurseForge selections remember their artwork; existing selections use Nova's
-orbital mark until selected again. Panels and controls use a black/silver finish
-and lightweight transitions compatible with the software renderer.
-
-The 2.55-second startup scene can be skipped or disabled in Settings. Reduced
-motion skips it, and restoring Nova from the tray does not replay it. Appearance
-preferences synchronize across existing profiles and are inherited by new ones.
+Free under MIT. See THIRD_PARTY_NOTICES.md for external libraries and game services.
