@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from urllib.request import Request,urlopen
 from process_manager import check_cancelled
 
-VERSION='1.01.2'
+VERSION='1.0.3'
 PRIVATE_BUILD=False
 REPO='5NoVa2/Saturn-Server-Launcher'
 API=f'https://api.github.com/repos/{REPO}/releases?per_page=100'
@@ -14,7 +14,10 @@ API=f'https://api.github.com/repos/{REPO}/releases?per_page=100'
 def version_key(tag):
     match=re.fullmatch(r'v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?',tag or '')
     if not match:return None
-    return (*map(int,match.group(1,2,3)),1 if match[4] is None else 0,int(match[4] or 0))
+    # Historical Saturn 1.01.1 / 1.01.2 builds used a padded minor by mistake.
+    major,minor,patch=map(int,match.group(1,2,3))
+    if match.group(1,2) == ('1','01') and patch in (1,2):minor=0
+    return (major,minor,patch,1 if match[4] is None else 0,int(match[4] or 0))
 
 
 def asset_url(url,tag,name):
@@ -42,7 +45,7 @@ def select_release(rows,current=VERSION):
 
 def fetch_bytes(url,limit):
     check_cancelled()
-    with urlopen(Request(url,headers={'User-Agent':'NovaServerStudio/'+VERSION,'Accept':'application/vnd.github+json' if url==API else 'application/octet-stream'}),timeout=45) as response:
+    with urlopen(Request(url,headers={'User-Agent':'SaturnServerLauncher/'+VERSION,'Accept':'application/vnd.github+json' if url==API else 'application/octet-stream'}),timeout=45) as response:
         data=response.read(limit+1)
     if len(data)>limit:raise ValueError('Update metadata exceeds size limit.')
     check_cancelled();return data
@@ -67,7 +70,7 @@ def download_update(release,cache):
     folder=Path(tempfile.mkdtemp(prefix='nova-',dir=parent));dest=folder/'SaturnSetup.exe'
     try:
         digest=hashlib.sha256();size=0
-        with urlopen(Request(release['installer'],headers={'User-Agent':'NovaServerStudio/'+VERSION}),timeout=90) as response,dest.open('wb') as output:
+        with urlopen(Request(release['installer'],headers={'User-Agent':'SaturnServerLauncher/'+VERSION}),timeout=90) as response,dest.open('wb') as output:
             while True:
                 check_cancelled();chunk=response.read(1024*1024)
                 if not chunk:break

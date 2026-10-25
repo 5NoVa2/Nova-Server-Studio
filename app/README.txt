@@ -1,4 +1,4 @@
-Saturn Server Launcher 1.01.2 playit preview
+Saturn Server Launcher 1.0.3
 Created by Nova. Free and open source under MIT.
 
 Exit Saturn from the tray, then install SaturnSetup.exe over the existing location. Your profiles, worlds and preferences remain.

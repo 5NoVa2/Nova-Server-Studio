@@ -19,6 +19,13 @@ class UpdaterTests(unittest.TestCase):
   self.assertIsNone(updater.select_release(rows,'1.0.0'))
  def test_missing_assets_and_unknown_tags_are_skipped(self):
   self.assertIsNone(updater.select_release([release('v1.0.1',assets=[]),release('unsafe')] ,'1.0.0'))
+ def test_padded_historical_versions_do_not_override_103_or_future_updates(self):
+  self.assertEqual(updater.version_key('1.01.1'),updater.version_key('1.0.1'))
+  self.assertEqual(updater.version_key('1.01.2'),updater.version_key('1.0.2'))
+  rows=[release('v1.01.1'),release('v1.0.3')]
+  self.assertEqual(updater.select_release(rows,'1.01.2')['version'],'v1.0.3')
+  self.assertIsNone(updater.select_release(rows,'1.0.3'))
+  self.assertGreater(updater.version_key('1.1.0'),updater.version_key('1.0.3'))
  def test_foreign_or_insecure_asset_urls_rejected(self):
   for url in ('http://github.com/x','https://evil.test/SaturnSetup.exe','https://github.com/other/repo/releases/download/v1.0.1/SaturnSetup.exe'):
    with self.assertRaises(ValueError):updater.asset_url(url,'v1.0.1','SaturnSetup.exe')

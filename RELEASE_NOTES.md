@@ -1,9 +1,11 @@
-# Saturn Server Launcher 1.01.2 — playit.gg preview
+# Saturn Server Launcher 1.0.3
 
-- Fix long connection-status text overflowing status cards; wrap text and grow cards to fit.
-- Optional playit.gg hosting alongside VPS SSH and direct LAN/public hosting.
-- Verified official portable agent, hidden managed process and shared multi-server lifecycle.
-- Browser approval and tunnel setup steps, matching local target and detected public join address.
-- Free-tier and Bedrock RakNet/NetherNet guidance.
+- Added optional playit.gg hosting alongside VPS tunnels and LAN / standard public hosting.
+- Fixed playit Copy Address by detecting assigned game tunnels in the background.
+- Fixed long connection-status text overflowing its box.
+- Added playit setup instructions and shared-agent management for multiple servers.
+- Corrected comparisons for the earlier 1.01.x version numbers.
 
-Preview only; not published as a release. Live account approval and end-to-end multiplayer still require testing.
+**Install:** Exit Saturn from the tray, then run SaturnSetup.exe. Existing profiles, settings and server files are kept. Builds labeled 1.01.1 or 1.01.2 may not offer this update automatically; install 1.0.3 manually once.
+
+playit account approval and tunnel creation happen on their website. Minecraft Java has a free tunnel option; Bedrock NetherNet requires Premium, with RakNet available where supported. Provider limits apply. Automated checks do not replace live account approval and a multiplayer connection test.

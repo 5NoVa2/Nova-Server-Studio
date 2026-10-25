@@ -1,7 +1,7 @@
 # Saturn Server Launcher
 
 Free, open-source Minecraft server management for Windows. **Created by Nova.**
-Current public release: **1.01.1**. This branch previews playit.gg support for 1.01.2.
+Current public release: **1.0.3**.
 
 Run Minecraft on your own Windows PC. Optionally connect it through your own
 VPS so friends can join without router port forwarding, using the VPS address
@@ -144,7 +144,7 @@ Help provides searchable, expandable troubleshooting for VPS/SSH, tunnels, DNS, 
 
 Uncheck **Use VPS tunnel** on Server or Settings → Hosting connection while stopped. Start hosting runs Minecraft without SSH. Java binds to network interfaces in direct mode; tunnel mode keeps Java on loopback. Use the PC LAN address for LAN joins. For internet joins, manually forward router TCP (Java) or UDP (Bedrock) to the profile’s local game port and allow the program/port in Windows Firewall. Set a separate direct public IP/domain and router public port in Domain & display. Existing VPS settings are preserved. No router or firewall rules are changed automatically. See Help → Host without a VPS for troubleshooting, CGNAT and double NAT.
 
-## playit.gg preview
+## playit.gg hosting
 
 Select **Use playit.gg tunnel** for a third hosting option. Prepare downloads the official supported portable 0.17.1 Windows x64 agent and verifies its pinned SHA-256 from the upstream release. No service is installed and no third-party binary is bundled. One owned agent is shared across profiles; account approval and game-tunnel creation happen in your browser. Set each local target to the exact 127.0.0.1 port shown by Saturn. Public addresses refresh in the background from the official `/v1/agents/rundata` endpoint using the existing native agent credential. Saturn matches each enabled loopback route to the selected profile’s local port; Java SRV hostnames stay intact. The portable agent’s stdout omits route details, so address discovery does not depend on its console output. Failed lookups clear stale addresses and retry automatically. Credentials and API responses are never copied into logs or settings. Java stays on loopback in playit mode.
 
