@@ -19,6 +19,7 @@ ApplicationWindow {
     font.family: 'Segoe UI'
     onClosing: function(close) { close.accepted=false; nova.action('tray') }
     Component.onCompleted: { shownProfileIndex=s.profileIndex || 0; syncServers(); intro.begin() }
+    function selectDashboardServer(index) { nova.selectProfile(index) }
     function fullscreen() { full=!full; if(full) showFullScreen(); else showNormal() }
     Shortcut { sequence: 'F11'; onActivated: win.fullscreen() }
     Shortcut { sequence: 'Escape'; onActivated: { if(intro.active) intro.finish(); else if(win.full) win.fullscreen() } }
@@ -121,7 +122,7 @@ ApplicationWindow {
                                         Rectangle { width: 7; height: 7; radius: 4; color: s.server==='Ready' ? '#acf1ce' : s.server==='Starting' ? '#f2cc91' : '#798594' }
                                         Caption { text: s.server.toUpperCase()+'  /  '+(s.installedEngine || s.engine).toUpperCase(); font.pixelSize: 10 }
                                     }
-                                    Text { text: s.profileName || 'My server'; color: '#f5f6fa'; font.pixelSize: 35; font.weight: Font.Light; Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Text { objectName: 'serverHeroName'; text: s.profileName || 'My server'; color: '#f5f6fa'; font.pixelSize: 35; font.weight: Font.Light; Layout.fillWidth: true; elide: Text.ElideRight }
                                     Body { text: (s.cf_pack.name || 'Minecraft '+s.version)+'  ·  '+(s.joinDisplay || 'localhost'); Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1 }
                                     RowLayout { spacing: 24
                                         Column { spacing: 5; Text { text: (s.players || []).length; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'PLAYERS'; font.pixelSize: 9 } }
@@ -131,7 +132,9 @@ ApplicationWindow {
                                     Item { Layout.fillHeight: true }
                                     RowLayout { spacing: 10
                                         BusyAction { text: s.server==='Stopped' ? '▷  Start hosting' : '□  Stop hosting'; primary: true; implicitWidth: 164; onClicked: nova.action(s.server==='Stopped' ? 'hosting' : 'stop') }
-                                        Action { text: 'Open workspace  ↗'; onClicked: win.page=1 }
+                                        BusyAction { text: 'Start local'; visible: s.server==='Stopped'; onClicked: nova.action('start') }
+                                        Action { text: 'Copy address'; onClicked: nova.action('copy') }
+                                        Action { text: 'Server setup  ↗'; onClicked: win.page=1 }
                                     }
                                 }
                             }
@@ -155,7 +158,7 @@ ApplicationWindow {
                                     }
                                 }
                                 HoverHandler { id: cardHover }
-                                TapHandler { onTapped: { nova.selectProfile(index); if((s.profileIndex || 0)===index) win.page=1 } }
+                                TapHandler { onTapped: win.selectDashboardServer(index) }
                             }
                         }
                         RowLayout { Layout.fillWidth: true; spacing: 14

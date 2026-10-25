@@ -1,3 +1,11 @@
+# Nova Server Studio 1.0.0-beta.6
+
+- Your servers cards now select the large dashboard panel without opening the Server tab.
+- Dashboard quick controls: Start hosting / Stop hosting, Start local, Copy address and explicit Server setup.
+- Busy-profile guards remain in place; a blocked selection keeps the current server selected.
+
+36 automated checks passed. Existing Windows requirements and beta limitations apply.
+
 # Nova Server Studio 1.0.0-beta.5
 
 - Silver orbital startup scene with Nova branding, particles and a dashboard fade.

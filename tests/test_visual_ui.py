@@ -32,4 +32,11 @@ class VisualUITests(unittest.TestCase):
   self.assertEqual(len(self.window.property('serverRows')),3)
   for index in range(6):
    self.window.setProperty('page',index);QTest.qWait(30);self.assertFalse(self.window.grabWindow().isNull())
+ def test_dashboard_card_selects_hero_without_navigating(self):
+  self.manager.setServersRoot(str(Path(self.temp.name)/'servers'));self.manager.renameProfile('First');self.manager.addProfile('Second');self.manager.selectProfile(0)
+  intro=self.load();intro.finish();self.window.selectDashboardServer(1);QTest.qWait(30)
+  self.assertEqual(self.window.property('page'),0);self.assertEqual(self.manager.current,1)
+  self.assertEqual(self.window.findChild(QObject,'serverHeroName').property('text'),'Second')
+  self.manager.active.publish(busy=True);self.window.selectDashboardServer(0);QTest.qWait(30)
+  self.assertEqual(self.manager.current,1);self.assertEqual(self.window.property('page'),0)
 if __name__=='__main__':unittest.main()
