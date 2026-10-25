@@ -5,6 +5,7 @@ from PySide6.QtCore import QObject,Property,Signal,Slot,Qt
 from PySide6.QtWidgets import QSystemTrayIcon,QFileDialog
 from connection_settings import Connection
 from updater import PRIVATE_BUILD
+from distribution import STORE_BUILD
 
 class HostManager(QObject):
     changed=Signal();apiKeyChanged=Signal();credentialsChanged=Signal();storageChanged=Signal();posted=Signal(object)
@@ -34,7 +35,7 @@ class HostManager(QObject):
                     backup=self.path.with_name('profiles.corrupt-'+uuid.uuid4().hex[:8]+'.json');self.path.rename(backup)
                     self.warning+=' The unreadable registry was preserved at '+str(backup)
             except OSError:pass
-        self.task_create_error='';self.update_info=None;self.update_download=None;self.update_busy=False;self.update_status='Private build · public updates disabled.' if PRIVATE_BUILD else 'Check for a newer public release.'
+        self.task_create_error='';self.update_info=None;self.update_download=None;self.update_busy=False;self.update_status='Updates are managed by Microsoft Store.' if STORE_BUILD else ('Private build · public updates disabled.' if PRIVATE_BUILD else 'Check for a newer public release.')
         self.sessions={}
         for entry in self.entries:
             session=bridge_class(app,entry['id'],self);self.sessions[entry['id']]=session
@@ -51,7 +52,7 @@ class HostManager(QObject):
     @Property('QVariantMap',notify=changed)
     def state(self):
         from updater import VERSION,PRIVATE_BUILD
-        values=dict(self.active.s);values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
+        values=dict(self.active.s);values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateStore=STORE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
         values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values.update(taskCreateError=self.task_create_error,schedules=[dict(row,label=__import__('task_queue').LABELS[row['operation']]) for row in self.queue.schedules.rows],scheduleTimezone='PC local time ('+time.strftime('%Z')+')',tasks=[dict(row) for row in self.queue.rows],queueRunning=self.queue.running or self.queue.current is not None,queuePaused=self.queue.paused)
         values['busy']=self.active.s['busy'] or self.exiting or bool(self.queue.current and self.queue.current['profile']==self.active.profile_id);values['exiting']=self.exiting
@@ -291,6 +292,8 @@ class HostManager(QObject):
     def update_action(self,name):
         try:
             from updater import check_updates,download_update,launch_after_exit,PRIVATE_BUILD
+            if STORE_BUILD:
+                self.update_status='Updates are managed by Microsoft Store. Open Store > Library to check for updates.';self.changed.emit();return
             if PRIVATE_BUILD:
                 self.update_status='Private build · public updates disabled.';self.changed.emit();return
             if name=='check_updates':

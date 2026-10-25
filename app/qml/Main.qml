@@ -425,12 +425,12 @@ ApplicationWindow {
                             ColumnLayout { id: updateColumn; Layout.fillWidth: true; spacing: 12
                                 Caption { text: 'SATURN UPDATES · '+s.appVersion }
                                 Body { text: s.updateStatus || ''; Layout.fillWidth: true }
-                                RowLayout {
+                                RowLayout { visible: !s.updateStore
                                     Action { objectName: 'checkUpdatesButton'; text: 'Check for updates'; enabled: !s.updatePrivate && !s.updateBusy && !s.exiting; onClicked: nova.action('check_updates') }
                                     Action { text: 'Download update'; visible: !!s.updateAvailable && !s.updateReady; enabled: !s.updateBusy && !s.exiting; onClicked: nova.action('download_update') }
                                     Action { text: 'Install update'; visible: !!s.updateReady; primary: true; enabled: !s.updateBusy && !s.exiting; onClicked: nova.action('install_update') }
                                 }
-                                Body { text: s.updatePrivate ? 'This private build is delivered directly. Public updates are disabled.' : 'Checks include public beta releases. Downloads are verified against the release SHA-256 checksum. Stop all servers and tunnels before installing. Updates never install automatically.'; Layout.fillWidth: true }
+                                Body { text: s.updateStore ? 'Microsoft Store manages this edition’s app updates. Open Microsoft Store → Library to check for updates.' : s.updatePrivate ? 'This private build is delivered directly. Public updates are disabled.' : 'Checks include public beta releases. Downloads are verified against the release SHA-256 checksum. Stop all servers and tunnels before installing. Updates never install automatically.'; Layout.fillWidth: true }
                                 Body { visible: !!s.updateAvailable; text: s.updateNotes || ''; textFormat: Text.PlainText; Layout.fillWidth: true; maximumLineCount: 12; elide: Text.ElideRight }
                             }
                         }

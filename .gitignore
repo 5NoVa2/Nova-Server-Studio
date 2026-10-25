@@ -24,3 +24,8 @@ MinecraftServer/
 **/world/
 **/worlds/
 *.backup-*/
+store-output/
+store-work/
+*.msix
+*.pfx
+*.cer
