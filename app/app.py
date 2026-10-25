@@ -106,7 +106,7 @@ class App:
         from theme import apply_theme
         if not embedded:
             apply_theme(root)
-            root.title('Nova | Downloads & server switching')
+            root.title('Saturn | Downloads & server switching')
             root.geometry('740x560')
         self.downloads = Path.home()/'Downloads'
         if os.name == 'nt':

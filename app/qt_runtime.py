@@ -5,7 +5,7 @@ import sys
 
 
 def configure_rendering():
-    """Use the software renderer proven to work on Nova's target PC."""
+    """Use the software renderer proven to work on Saturn's target PC."""
     os.environ['QT_QUICK_BACKEND'] = 'software'
     os.environ['QSG_RHI_BACKEND'] = 'software'
 

@@ -18,7 +18,7 @@ class CurseBrowser:
         self.embedded=embedded;self.on_close=on_close;self.on_pick=on_pick
         if embedded:self.window=ttk.Frame(parent);self.window.pack(fill='both',expand=True)
         else:
-            self.window=tk.Toplevel(parent);self.window.title('Nova | Discover modpacks');self.window.geometry('1100x800');apply_theme(self.window)
+            self.window=tk.Toplevel(parent);self.window.title('Saturn | Discover modpacks');self.window.geometry('1100x800');apply_theme(self.window)
         self.results=[];self.releases=[];self.project=None;self.file_index=0;self.index=0;self.context=None
         self.busy=False;self.closed=False;self.queue=queue.Queue();self.image_requests=queue.Queue();self.image_results=queue.Queue();self.photos={};self.pack_token=0;self.mod_token=0;self.mod_rows=[]
         for _ in range(4):threading.Thread(target=self.image_worker,daemon=True).start()

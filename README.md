@@ -1,7 +1,7 @@
 # Saturn Server Launcher
 
 Free, open-source Minecraft server management for Windows. **Created by Nova.**
-Previously Nova Server Studio. Current public beta: **1.0.0-beta.17**.
+Current public beta: **1.0.0-beta.18**.
 
 Run Minecraft on your own Windows PC. Optionally connect it through your own
 VPS so friends can join without router port forwarding, using the VPS address
@@ -23,9 +23,8 @@ network must allow the outbound tunnel. This does not guarantee anonymity.
 ## Install or upgrade
 
 1. Install **64-bit Python 3.10+** with pip, Tcl/Tk and the Python launcher.
-2. Download **NovaSetup.exe** from Releases. The asset name is retained so older
-   Nova installations can discover the update. The installed app is Saturn.
-3. Exit Nova/Saturn from the tray, then run the installer over the existing location.
+2. Download **SaturnSetup.exe** from Releases. Older builds need this manual installer once; future updates use Saturn filenames.
+3. Exit Saturn from the tray, then run the installer over the existing location.
 4. First launch downloads Qt if needed. Existing profiles, server folders,
    encrypted API keys and preferences are retained.
 
@@ -126,7 +125,7 @@ python installer/build_verified_installer.py
 
 Use --makensis to specify the compiler. The helper rejects concurrent builds,
 compiles into an isolated path, verifies NSIS length and CRC, then atomically
-promotes dist/NovaSetup.exe. Build scripts never include profiles, worlds,
+promotes dist/SaturnSetup.exe. Build scripts never include profiles, worlds,
 credentials, downloaded runtimes or development logs in the installer.
 
 Run checks with:
@@ -136,3 +135,7 @@ python -m unittest discover -s tests -q
 ```
 
 Free under MIT. See THIRD_PARTY_NOTICES.md for external libraries and game services.
+
+## Help and join address
+
+Help provides searchable, expandable troubleshooting for VPS/SSH, tunnels, DNS, ports and common app issues. Edit the active profile’s join address in Settings → Domain & display, then Save join address. The same preference is shared with VPS connection settings. This updates the address Saturn shows/copies; it does not edit DNS at your provider. DNS guidance is provider-neutral.

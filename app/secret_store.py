@@ -22,7 +22,7 @@ def _crypt(data, decrypt=False):
     else:
         function=crypt.CryptProtectData
         function.argtypes=[ctypes.POINTER(Blob),wintypes.LPCWSTR,ctypes.POINTER(Blob),ctypes.c_void_p,ctypes.c_void_p,wintypes.DWORD,ctypes.POINTER(Blob)]
-        description='Nova CurseForge API key'
+        description='Saturn CurseForge API key'
     function.restype=wintypes.BOOL
     if not function(ctypes.byref(source),description,None,None,None,1,ctypes.byref(out)):
         raise ctypes.WinError(ctypes.get_last_error())

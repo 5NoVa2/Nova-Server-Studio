@@ -1,4 +1,4 @@
-"""Nova single-window Minecraft server manager with in-process SSH."""
+"""Saturn single-window Minecraft server manager with in-process SSH."""
 from bubble_ui import BubbleButton, BubbleNotebook, BubbleCard, Launcher, BubbleBadge
 from process_manager import managed_popen,start_worker
 import base64
@@ -50,7 +50,7 @@ def setup_vanilla(target,version,ram,log):
         temp=Path(temp); log('Downloading and verifying the vanilla server...')
         download(jar['url'],temp/'server.jar','sha1',jar['sha1'])
         (temp/'eula.txt').write_text('eula=true\n')
-        (temp/'server.properties').write_text('server-ip=127.0.0.1\nserver-port=25565\nonline-mode=true\nenable-query=false\nenable-rcon=false\nmotd=Nova Minecraft server\n')
+        (temp/'server.properties').write_text('server-ip=127.0.0.1\nserver-port=25565\nonline-mode=true\nenable-query=false\nenable-rcon=false\nmotd=Saturn Minecraft server\n')
         state={'version':version,'java':str(java),'ram':int(ram)}
         (temp/'switcher-server.json').write_text(json.dumps(state,indent=2))
         (temp/'Start-Server.bat').write_text('@echo off\ncd /d "%~dp0"\n"'+str(java)+'" -Xms1G -Xmx'+str(ram)+'G -jar server.jar nogui\npause\n')
@@ -83,7 +83,7 @@ class Control:
         top=ttk.Frame(root,padding=(22,12));top.pack(fill='x')
         ttk.Label(top,text='NOVA',style='Logo.TLabel').pack(side='left')
         ttk.Label(top,text='SERVER STUDIO / Created by Nova',style='Muted.TLabel').pack(side='left',padx=18)
-        BubbleButton(top,text='Exit Nova',style='Danger.TButton',command=self.exit_app).pack(side='right')
+        BubbleButton(top,text='Exit Saturn',style='Danger.TButton',command=self.exit_app).pack(side='right')
         BubbleButton(top,text='Minimize to tray',command=self.minimize_to_tray).pack(side='right',padx=8)
         self.fullscreen_button=BubbleButton(top,text='Full screen  F11',command=self.toggle_fullscreen);self.fullscreen_button.pack(side='right')
         status=ttk.Frame(root,padding=(22,0,22,10));status.pack(fill='x')
@@ -103,7 +103,7 @@ class Control:
             page=ttk.Frame(self.navigation);self.navigation.add(page,text=name);self.pages[name]=page
         self.launcher=Launcher(self.pages['Home'],[('Control center','cube',self.dashboard),('Modpacks','pack',self.browse_curse),('Server settings','settings',self.open_server_settings),('Start hosting','play',self.start_hosting)])
         self.launcher.pack(fill='both',expand=True)
-        root.title('Nova | Minecraft Server Studio')
+        root.title('Saturn | Minecraft Server Studio')
         screen_height=root.winfo_screenheight()
         root.geometry('1060x'+str(min(870,max(680,screen_height-90))))
         root.minsize(940,650)
@@ -195,7 +195,7 @@ class Control:
         ttk.Label(self.credentials,text='Private key passphrase / optional',style='CardMuted.TLabel').pack(anchor='w',pady=(6,3))
         self.passphrase=tk.StringVar()
         ttk.Entry(self.credentials,textvariable=self.passphrase,show='*').pack(fill='x')
-        ttk.Label(self.credentials,text='Credentials stay in memory. SSH runs inside Nova.',style='CardMuted.TLabel').pack(anchor='w',pady=(6,12))
+        ttk.Label(self.credentials,text='Credentials stay in memory. SSH runs inside Saturn.',style='CardMuted.TLabel').pack(anchor='w',pady=(6,12))
 
 
 
@@ -623,11 +623,11 @@ class Control:
         if getattr(self,'fullscreen',False):self.resume_fullscreen=True;self.leave_fullscreen()
         if self.tray is not None and self.tray.ready.is_set():
             self.root.withdraw()
-            self.log('Nova minimized to the notification area. Server and tunnel remain running.')
+            self.log('Saturn minimized to the notification area. Server and tunnel remain running.')
         else:
             self.hide_when_tray_ready=True
             self.root.iconify()
-            self.log('Tray is not ready; Nova is minimized to the taskbar. Hosting continues.')
+            self.log('Tray is not ready; Saturn is minimized to the taskbar. Hosting continues.')
     def close(self):
         # X hides the interface; it never stops Python, the server or the tunnel.
         self.minimize_to_tray()
@@ -635,11 +635,11 @@ class Control:
         if self.exit_requested:return
         self.restore_window()
         if self.settings_panel and (self.settings_panel.property_dirty() or self.settings_panel.editor_dirty()):
-            if not messagebox.askyesno('Unsaved server settings','Discard unsaved server-file edits and exit Nova?'):return
+            if not messagebox.askyesno('Unsaved server settings','Discard unsaved server-file edits and exit Saturn?'):return
         if not self.save_settings(show=True):return
         self.exit_requested=True
-        self.log('Exiting Nova: stopping tunnel and saving the server world...')
-        self.root.title('Nova | Saving world and shutting down...')
+        self.log('Exiting Saturn: stopping tunnel and saving the server world...')
+        self.root.title('Saturn | Saving world and shutting down...')
         from process_manager import cancelled,stop_all,wait_workers
         cancelled.set()
         self.stop_tunnel()

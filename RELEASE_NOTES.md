@@ -1,25 +1,13 @@
-# Saturn Server Launcher 1.0.0-beta.17
+# Saturn Server Launcher 1.0.0-beta.18
 
-Created by Nova. Free under MIT. Replaces the public Nova beta.6 build.
+Created by Nova. Free under MIT.
 
-- Saturn branding and streamlined sidebar, with Modpacks inside Server.
-- Prepare a world → Browse modpacks popup, artwork, release details and server-ready filtering.
-- Single-click Explorer-style file navigation and editor, folder identification and Save All.
-- Persistent task schedules: Start, Stop, Save world, Backup or a custom Minecraft console command.
-- Collapsible Settings and Java Auto / 8 / 11 / 17 / 21 / 25 selection with background preparation.
-- Live Windows server-process CPU and resident RAM display.
-- Reference-inspired particle intro and original sounds, soft click pings and quiet tonal transitions.
-- Global mute, volume control and separate startup sound preference.
-- Installer integrity fix: isolated build, atomic promotion, NSIS length and CRC verification.
-- Public updater enabled. Existing installs retain their profiles, worlds and preferences.
+- Saturn branding throughout install/uninstall prompts, app messages and release downloads.
+- GitHub repository renamed Saturn-Server-Launcher.
+- Help section with 14 searchable, expandable troubleshooting topics covering VPS/SSH, ports, connection refused, DNS, Cloudflare and app issues.
+- Join-address editor stays in Settings → Domain & display; DNS instructions begin “At your domain panel…”.
+- Saved domains refresh the displayed join address without changing DNS at your provider.
 
-## Install / upgrade
+Exit Saturn from the tray before installing SaturnSetup.exe over your existing installation. Profiles, worlds and preferences are preserved. Older builds need this manual installer once because release assets now use Saturn names. Future updates use the new repository and installer name.
 
-Exit Nova/Saturn from the tray and install NovaSetup.exe over the existing location.
-The asset name stays NovaSetup.exe for updater compatibility; the installed app is Saturn.
-Requires Windows x64 and 64-bit Python 3.10+ with pip, Tcl/Tk and Python launcher.
-First launch downloads Qt. Bring your own CurseForge key and optional VPS.
-
-68 automated checks passed. Packaged installer CRC/length and all 55 application
-payload files verified. Native Windows audio, live multiplayer/CurseForge and
-long-running hosting remain beta testing areas. No sleep-on-join support.
+The installer is unsigned; Windows may show an unknown-publisher warning. Requires 64-bit Windows 10+ and Python 3.10+ with pip, Tcl/Tk and the Python launcher.

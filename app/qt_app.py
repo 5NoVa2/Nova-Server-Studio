@@ -1,4 +1,4 @@
-"""Nova Qt Quick frontend. Backend operations run on managed workers."""
+"""Saturn Qt Quick frontend. Backend operations run on managed workers."""
 import json, os, socket, subprocess, sys, threading, time, tempfile
 from pathlib import Path
 from qt_runtime import configure_rendering
@@ -26,6 +26,8 @@ class Bridge(QObject):
         self.s.update(players=[],agreed=False,propertyDirty=False,filesLoaded=False,installedEngine='',joinDisplay=self.s['join_address'])
         from server_stats import ServerStats
         self.stats=ServerStats();self.s.update(cpuLoad=None,ramBytes=None)
+        from help_content import TOPICS
+        self.s['helpTopics']=TOPICS
         self.log_lock=threading.Lock();self.log_pending=[]
         self.properties_original={};self.last_files_scan=0;self.last_player_poll=0;self.loaded_folder=None;self.folder_editing=False
         from players import PlayerTracker
@@ -116,6 +118,19 @@ class Bridge(QObject):
             self.publish(**{key:value})
             if key in self.store.data:self.save()
             if key=='folder':self.refresh_files()
+    @Slot(str,result=bool)
+    def setJoinAddress(self,value):
+        if self.s['exiting']:return False
+        try:
+            from connection_settings import host
+            normalized=host(value) if value.strip() else ''
+        except (ValueError,UnicodeError) as error:self.error(error);return False
+        previous=self.s['join_address'];self.s['join_address']=normalized
+        if not self.save():
+            self.publish(join_address=previous);return False
+        self.publish(joinDisplay=self.join_display(),error='')
+        self.changed.emit()
+        return True
     @Slot(str,str)
     def draft(self,key,value):
         if key in self.store.data and not self.s['exiting']:
@@ -201,7 +216,7 @@ class Bridge(QObject):
                 if not self.s.get('agreed'):raise ValueError('Read and accept the Minecraft EULA before installation.')
                 from engines import setup_engine
                 kind=self.s['engine'];target=self.s['folder'];version=self.s['version'];loader=self.s['loader'];ram=int(self.s['ram']);selection=self.s['cf_pack'];key=self.secrets['apiKey']
-                self.confirm('Replace every server file?',target+'\n\nThis deletes the old world, mods and configuration. Backups are manual. Stop any server launched outside Nova first.',lambda yes:self.task('Installing '+kind+'…',lambda:setup_engine(kind,target,version,loader,ram,self.log,selection,key),self.installed) if yes else None);return
+                self.confirm('Replace every server file?',target+'\n\nThis deletes the old world, mods and configuration. Backups are manual. Stop any server launched outside Saturn first.',lambda yes:self.task('Installing '+kind+'…',lambda:setup_engine(kind,target,version,loader,ram,self.log,selection,key),self.installed) if yes else None);return
             if name=='backup':
                 self.stopped();from app import manual_backup
                 self.save_all();target=self.s['folder']
@@ -219,7 +234,7 @@ class Bridge(QObject):
                         if url:
                             source=Path(temp)/'server.zip';download(url,source,limit=10*1024**3)
                         install(source,target)
-                    self.log('Server ZIP imported. Follow the pack launcher instructions if it has no Nova launch metadata.')
+                    self.log('Server ZIP imported. Follow the pack launcher instructions if it has no Saturn launch metadata.')
                 self.confirm('Replace every server file?',target+'\nAll old files will be replaced by the selected ZIP. No automatic backup.',lambda yes:self.task('Importing server ZIP…',run,self.installed) if yes else None);return
             if name=='downloads':
                 paths=sorted((Path.home()/'Downloads').glob('*.zip'),key=lambda p:p.stat().st_mtime,reverse=True)
@@ -249,7 +264,7 @@ class Bridge(QObject):
                     from ssh_backend import connect,configure
                     client=connect(*creds,self.approve,self.log,host=c.vps_host,username=c.ssh_username,port=c.ssh_port)
                     configure(client,script,self.log,use_sudo=c.ssh_username!='root')
-                self.confirm('Configure VPS?',f'Apply Nova SSH forwarding and game firewall settings on {c.ssh_username}@{c.vps_host}:{c.ssh_port}?',lambda yes:self.task('Configuring VPS…',configure) if yes else None);return
+                self.confirm('Configure VPS?',f'Apply Saturn SSH forwarding and game firewall settings on {c.ssh_username}@{c.vps_host}:{c.ssh_port}?',lambda yes:self.task('Configuring VPS…',configure) if yes else None);return
             if name=='test':
                 c=Connection.parse(self.s);bedrock=self.tunnel_kind()=='Bedrock';public=int(self.s['remote_bedrock_port'] if bedrock else self.s['remote_java_port']);local=int(self.s['local_bedrock_port'] if bedrock else self.s['local_java_port'])
                 def test():
@@ -566,7 +581,7 @@ class Bridge(QObject):
         selection=dict(artwork=(project.get('logo') or {}).get('thumbnailUrl',''),project_id=project['id'],file_id=release['id'],name=project['name'],release=release.get('displayName') or release.get('fileName') or ('Release '+str(release['id'])))
         self.publish(cf_pack=selection,engine='CurseForge');self.save();self.log('Selected '+selection['name']+' / '+selection['release'])
     def setup_tray(self):
-        icon=QIcon(str(BASE/'Nova.ico'));self.app.setWindowIcon(icon);self.tray=QSystemTrayIcon(icon,self.app);self.tray.setToolTip('Saturn Server Launcher')
+        icon=QIcon(str(BASE/'Saturn.ico'));self.app.setWindowIcon(icon);self.tray=QSystemTrayIcon(icon,self.app);self.tray.setToolTip('Saturn Server Launcher')
         self.menu=QMenu();self.menu.addAction('Open Saturn',self.restore);self.menu.addSeparator();self.menu.addAction('Exit Saturn • stop hosting',self.exit)
         self.tray.setContextMenu(self.menu);self.tray.activated.connect(lambda reason:self.restore() if reason in (QSystemTrayIcon.ActivationReason.Trigger,QSystemTrayIcon.ActivationReason.DoubleClick) else None);self.tray.show()
     def restore(self):self.window.showNormal();self.window.raise_();self.window.requestActivate()
@@ -599,12 +614,12 @@ def main():
     from hosts import HostManager
     bridge=HostManager(app,Bridge);engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('nova',bridge)
     engine.load(QUrl.fromLocalFile(str(BASE/'qml'/'Main.qml')))
-    if not engine.rootObjects():raise RuntimeError('Nova QML could not load. See app.log.')
+    if not engine.rootObjects():raise RuntimeError('Saturn QML could not load. See app.log.')
     bridge.window=engine.rootObjects()[0];bridge.setup_tray()
     # Explicitly restore after the event loop starts, including shell launches.
     def show_startup():
         bridge.restore()
-        print('Nova main window restored; visible='+str(bridge.window.isVisible()),flush=True)
+        print('Saturn main window restored; visible='+str(bridge.window.isVisible()),flush=True)
     QTimer.singleShot(0,show_startup)
     result=app.exec()
     if bridge.tray:bridge.tray.hide()

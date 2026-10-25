@@ -56,7 +56,7 @@ class ScheduleStore:
             datetime.fromisoformat(row['anchor']);seen.add(row['id'])
             if row['operation']=='command':validate_command(row.get('command',''))
             if row.get('enabled') and float(row.get('next_due') or 0)<=now:
-                row['next_due']=next_occurrence(row['anchor'],row['repeat'],now);row['enabled']=row['next_due'] is not None;row['last_status']='Missed while Nova was closed'
+                row['next_due']=next_occurrence(row['anchor'],row['repeat'],now);row['enabled']=row['next_due'] is not None;row['last_status']='Missed while Saturn was closed'
         self.rows=data
         if self.rows:self.save()
     except FileNotFoundError:pass

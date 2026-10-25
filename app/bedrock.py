@@ -47,7 +47,7 @@ def setup(target,version,log):
             if executable.read(2)!=b'MZ':raise ValueError('Invalid Windows Bedrock executable.')
         props=folder/'server.properties'
         original=props.read_text(encoding='utf-8') if props.exists() else ''
-        values={'server-name':'Nova Bedrock','server-port':'19132','server-portv6':'19133','online-mode':'true','enable-lan-visibility':'false'}
+        values={'server-name':'Saturn Bedrock','server-port':'19132','server-portv6':'19133','online-mode':'true','enable-lan-visibility':'false'}
         lines=[line for line in original.splitlines() if line.split('=',1)[0].strip() not in values]
         props.write_text('\n'.join(lines+[k+'='+v for k,v in values.items()])+'\n',encoding='utf-8')
         (folder/'eula.txt').write_text('eula=true\n',encoding='utf-8')

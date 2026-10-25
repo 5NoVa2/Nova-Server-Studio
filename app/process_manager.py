@@ -1,4 +1,4 @@
-"""Track Nova-owned processes and stop their trees on explicit application exit."""
+"""Track Saturn-owned processes and stop their trees on explicit application exit."""
 import os
 import signal
 import subprocess
@@ -12,7 +12,7 @@ _job=None
 
 
 def check_cancelled():
-    if cancelled.is_set():raise RuntimeError('Operation canceled because Nova is exiting.')
+    if cancelled.is_set():raise RuntimeError('Operation canceled because Saturn is exiting.')
 
 
 def _windows_job():

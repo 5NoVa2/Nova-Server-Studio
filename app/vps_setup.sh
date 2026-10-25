@@ -48,7 +48,7 @@ systemctl reload ssh
 trap - ERR
 if command -v ufw >/dev/null && ufw status | grep -q 'Status: active'; then
     ufw allow 25565/tcp comment 'Minecraft reverse SSH tunnel'
-    ufw allow 19132/udp comment 'Nova Bedrock UDP relay'
+    ufw allow 19132/udp comment 'Saturn Bedrock UDP relay'
 fi
 echo
 echo "VPS setup complete. SSH configuration backup: $BACKUP"

@@ -19,8 +19,8 @@ ApplicationWindow {
     property alias uiSounds: uiAudio
     UiSounds { id: uiAudio; soundsEnabled: s.sound_enabled!==false; masterVolume: s.sound_volume===undefined ? 0.3 : s.sound_volume; interactive: win.visible && !intro.active && !s.exiting }
     property bool full: false
-    property var titles: ['Dashboard','Server','Modpacks','Files','Settings','Players','Tasks']
-    property var navigation: [{label:'Dashboard',page:0,icon:'◈'},{label:'Server',page:1,icon:'▷'},{label:'Files',page:3,icon:'≡'},{label:'Tasks',page:6,icon:'☷'},{label:'Players',page:5,icon:'♙'},{label:'Settings',page:4,icon:'⚙'}]
+    property var titles: ['Dashboard','Server','Modpacks','Files','Settings','Players','Tasks','Help']
+    property var navigation: [{label:'Dashboard',page:0,icon:'◈'},{label:'Server',page:1,icon:'▷'},{label:'Files',page:3,icon:'≡'},{label:'Tasks',page:6,icon:'☷'},{label:'Players',page:5,icon:'♙'},{label:'Settings',page:4,icon:'⚙'},{label:'Help',page:7,icon:'?'}]
     property bool showPackApi: false
     property bool serverReleasesOnly: true
     function packReleases() { return (s.releases || []).map((row,index)=>({row:row,index:index})).filter(item=>!serverReleasesOnly || item.row.serverPackFileId) }
@@ -63,7 +63,7 @@ ApplicationWindow {
         }
     }
     Rectangle { anchors.fill: parent; gradient: Gradient { GradientStop { position: 0; color: '#10141e' } GradientStop { position: 0.7; color: '#090b10' } } }
-    NovaMark { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 600; height: 450; opacity: 0.07 }
+    SaturnMark { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 600; height: 450; opacity: 0.07 }
     Item {
         anchors.fill: parent; clip: true
         Repeater {
@@ -85,7 +85,7 @@ ApplicationWindow {
             Layout.preferredWidth: 184; Layout.fillHeight: true; radius: 25; color: '#b8101319'; border.color: '#2c333d'
             ColumnLayout {
                 anchors.fill: parent; anchors.margins: 20; spacing: 10
-                NovaMark { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 132; Layout.preferredHeight: 96 }
+                SaturnMark { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 132; Layout.preferredHeight: 96 }
                 Text { text: 'S A T U R N'; color: '#f3f4fa'; font.pixelSize: 21; font.weight: Font.Bold; Layout.topMargin: 12 }
                 Caption { text: 'SERVER LAUNCHER'; font.pixelSize: 9; Layout.bottomMargin: 20 }
                 Repeater {
@@ -152,7 +152,7 @@ ApplicationWindow {
                         }
                         Panel { Layout.fillWidth: true; implicitHeight: 266; clip: true
                             Image { anchors.fill: parent; source: (s.cf_pack || {}).artwork || ''; asynchronous: true; fillMode: Image.PreserveAspectCrop; opacity: 0.18 }
-                            NovaMark { anchors.right: parent.right; anchors.rightMargin: -24; anchors.verticalCenter: parent.verticalCenter; width: 360; height: 270; opacity: 0.4 }
+                            SaturnMark { anchors.right: parent.right; anchors.rightMargin: -24; anchors.verticalCenter: parent.verticalCenter; width: 360; height: 270; opacity: 0.4 }
                             RowLayout { anchors.fill: parent; anchors.margins: 28; spacing: 20
                                 ColumnLayout { Layout.fillWidth: true; spacing: 12
                                     RowLayout { spacing: 8
@@ -500,7 +500,8 @@ ApplicationWindow {
                         SettingsSection { objectName: 'dnsSettings'; title: 'Domain & display'
                             ColumnLayout { id: dnsColumn; Layout.fillWidth: true; spacing: 12
                                 Caption { text: 'DOMAIN & DISPLAY' }
-                                Body { text: 'At IONOS, create an A record for '+(s.join_address || 'your game domain')+' pointing to '+(s.vps_host || 'your VPS IPv4 address')+'. Use @ for the root domain. TTL of 1 hour is fine. If using Cloudflare, select DNS only. Changes here do not update DNS.'; Layout.fillWidth: true }
+                                JoinAddressEditor { snapshot: win.s; Layout.fillWidth: true }
+                                Body { text: 'At your domain panel, create an A record for '+(s.join_address || 'your game domain')+' pointing to '+(s.vps_host || 'your VPS IPv4 address')+'. Use @ for the root domain. TTL of 1 hour is fine. If using Cloudflare, select DNS only. Changes here do not update DNS.'; Layout.fillWidth: true }
                                 Body { text: 'Java TCP: '+s.remote_java_port+'   •   Bedrock UDP: '+s.remote_bedrock_port+'\nVPS setup needs root or passwordless sudo. Allow every profile’s public port in provider firewalls.'; Layout.fillWidth: true }
                                 SoundSwitch { text: 'Play startup scene'; checked: s.startup_animation!==false; palette.windowText: '#c0c8d8'; onToggled: nova.update('startup_animation',checked) }
                                 SoundSwitch { objectName: 'soundEnabledToggle'; text: 'Enable sounds'; checked: s.sound_enabled!==false; palette.windowText: '#c0c8d8'; onToggled: { nova.update('sound_enabled',checked); if(checked) uiAudio.play('click') } }
@@ -595,6 +596,7 @@ ApplicationWindow {
                         }
                     }
                 } }
+                HelpPage { snapshot: win.s }
             }
             Rectangle { Layout.fillWidth: true; implicitHeight: 38; color: '#10141d'
                 RowLayout { anchors.fill: parent; anchors.leftMargin: 26; anchors.rightMargin: 26
@@ -639,7 +641,7 @@ Item { ColumnLayout {
                                         ColumnLayout { anchors.fill: parent; anchors.margins: 16; spacing: 10
                                             RowLayout { Layout.fillWidth: true; spacing: 12
                                                 Rectangle { Layout.preferredWidth: 64; Layout.preferredHeight: 64; radius: 16; color: '#0c1118'; border.color: '#303b4a'
-                                                    NovaMark { anchors.fill: parent; opacity: 0.55; visible: packArt.status!==Image.Ready }
+                                                    SaturnMark { anchors.fill: parent; opacity: 0.55; visible: packArt.status!==Image.Ready }
                                                     Image { id: packArt; anchors.fill: parent; anchors.margins: 5; source: (modelData.logo || {}).thumbnailUrl || ''; asynchronous: true; cache: true; sourceSize.width: 128; sourceSize.height: 128; fillMode: Image.PreserveAspectFit }
                                                 }
                                                 ColumnLayout { Layout.fillWidth: true; spacing: 5
@@ -661,7 +663,7 @@ Item { ColumnLayout {
                             }
                             Panel { anchors.fill: parent; visible: !s.packs.length
                                 ColumnLayout { anchors.centerIn: parent; width: parent.width-56; spacing: 14
-                                    NovaMark { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 145; Layout.preferredHeight: 110 }
+                                    SaturnMark { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 145; Layout.preferredHeight: 110 }
                                     Text { text: s.busy ? 'Finding your next adventure…' : nova.apiKey.length ? 'Your next adventure is out there.' : 'Connect to CurseForge'; color: '#e6edf8'; font.pixelSize: 21; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                                     Body { text: s.busy ? s.activity : nova.apiKey.length ? 'Choose a sort and search to explore packs. Try a different name or Minecraft version if there are no results.' : 'Add your own API key above, then browse popular packs and server-ready releases.'; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                                     BusyAction { text: 'Browse popular packs'; Layout.alignment: Qt.AlignHCenter; enabled: !!nova.apiKey.length && !s.busy; onClicked: nova.query('','Popular','',0) }
@@ -672,7 +674,7 @@ Item { ColumnLayout {
                             ScrollView { id: detail; anchors.fill: parent; anchors.margins: 18; contentWidth: availableWidth; clip: true
                                 ColumnLayout { width: detail.availableWidth; spacing: 12
                                     Rectangle { Layout.alignment: Qt.AlignHCenter; width: 88; height: 88; radius: 20; color: '#0b1017'; border.color: '#303b4a'
-                                        NovaMark { anchors.fill: parent; visible: detailArt.status!==Image.Ready; opacity: 0.7 }
+                                        SaturnMark { anchors.fill: parent; visible: detailArt.status!==Image.Ready; opacity: 0.7 }
                                         Image { id: detailArt; anchors.fill: parent; anchors.margins: 8; source: (s.project.logo || {}).thumbnailUrl || ''; asynchronous: true; sourceSize.width: 160; sourceSize.height: 160; fillMode: Image.PreserveAspectFit }
                                     }
                                     Caption { text: s.project.id ? 'PACK DETAILS' : 'YOUR NEXT SERVER'; font.pixelSize: 9; Layout.alignment: Qt.AlignHCenter }

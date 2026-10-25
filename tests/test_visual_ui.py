@@ -30,7 +30,7 @@ class VisualUITests(unittest.TestCase):
   self.manager.setServersRoot(str(Path(self.temp.name)/'servers'));self.manager.addProfile('Modded survival');self.manager.addProfile('Friends')
   intro=self.load();intro.finish();QTest.qWait(50)
   self.assertEqual(len(self.window.property('serverRows')),3)
-  for index in range(7):
+  for index in range(8):
    self.window.setProperty('page',index);QTest.qWait(30);self.assertFalse(self.window.grabWindow().isNull())
  def test_dashboard_card_selects_hero_without_navigating(self):
   self.manager.setServersRoot(str(Path(self.temp.name)/'servers'));self.manager.renameProfile('First');self.manager.addProfile('Second');self.manager.selectProfile(0)
@@ -71,14 +71,14 @@ class VisualUITests(unittest.TestCase):
  def test_sidebar_order_and_server_modpacks_section(self):
   from PySide6.QtCore import QPointF,Qt
   intro=self.load();intro.finish()
-  nav=self.window.property('navigation');nav=nav.toVariant() if hasattr(nav,'toVariant') else nav;self.assertEqual([item['label'] for item in nav],['Dashboard','Server','Files','Tasks','Players','Settings'])
-  self.assertEqual([item['page'] for item in nav],[0,1,3,6,5,4])
+  nav=self.window.property('navigation');nav=nav.toVariant() if hasattr(nav,'toVariant') else nav;self.assertEqual([item['label'] for item in nav],['Dashboard','Server','Files','Tasks','Players','Settings','Help'])
+  self.assertEqual([item['page'] for item in nav],[0,1,3,6,5,4,7])
   self.window.setProperty('page',2);QTest.qWait(40)
   def items(item):
    yield item
    for child in item.childItems():yield from items(child)
   buttons=[item for item in items(self.window.contentItem()) if item.objectName().startswith('nav_')]
-  self.assertEqual([item.objectName() for item in buttons],['nav_Dashboard','nav_Server','nav_Files','nav_Tasks','nav_Players','nav_Settings'])
+  self.assertEqual([item.objectName() for item in buttons],['nav_Dashboard','nav_Server','nav_Files','nav_Tasks','nav_Players','nav_Settings','nav_Help'])
   self.assertTrue(next(item for item in buttons if item.objectName()=='nav_Server').property('primary'))
   tab=self.window.findChild(QObject,'serverControlTab');point=tab.mapToScene(QPointF(tab.width()/2,tab.height()/2)).toPoint()
   QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point);self.assertEqual(self.window.property('page'),1)
@@ -161,4 +161,38 @@ class VisualUITests(unittest.TestCase):
   self.assertFalse(SettingsStore(self.manager.active.store.path).data['sound_enabled'])
   self.manager.active.update('sound_enabled',True);self.manager.active.update('sound_volume',0);QTest.qWait(10)
   bus.play('click');self.assertEqual(spy.count(),before)
+ def test_help_search_expansion_survives_status_updates(self):
+  intro=self.load();intro.finish();self.window.setProperty('page',7);QTest.qWait(30)
+  help_page=self.window.findChild(QObject,'helpPage');search=help_page.findChild(QObject,'helpSearch')
+  self.assertIsNone(help_page.findChild(QObject,'helpJoinAddressField'))
+  search.setProperty('text','publickey');QTest.qWait(30)
+  matches=help_page.property('matches');matches=matches.toVariant() if hasattr(matches,'toVariant') else matches
+  self.assertEqual([row['id'] for row in matches],['publickey'])
+  def items(item):
+   yield item
+   for child in item.childItems():yield from items(child)
+  topic=next(item for item in items(self.window.contentItem()) if item.objectName()=='helpTopic_publickey');topic.setProperty('expanded',True)
+  self.manager.active.publish(activity='A routine status update');QTest.qWait(600)
+  self.assertTrue(topic.property('expanded'))
+  search.setProperty('text','no-such-help-topic');QTest.qWait(20)
+  self.assertEqual(help_page.findChild(QObject,'helpResultCount').property('text'),'0 help topics')
+ def test_settings_domain_editor_save_validation_and_profile_isolation(self):
+  from settings_store import SettingsStore
+  self.manager.active.update('vps_host','203.0.113.20');self.manager.active.update('remote_java_port',25566)
+  intro=self.load();intro.finish();self.window.setHeight(1800);self.window.setProperty('page',4)
+  page=self.window.findChild(QObject,'dnsSettings');page.setProperty('expanded',True);QTest.qWait(40)
+  field=page.findChild(QObject,'helpJoinAddressField')
+  from PySide6.QtCore import QPointF,Qt
+  point=field.mapToScene(QPointF(field.width()/2,field.height()/2)).toPoint();QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point)
+  app.clipboard().setText('Play.Example.com.');QTest.keyClick(self.window,Qt.Key_A,Qt.ControlModifier);QTest.keyClick(self.window,Qt.Key_V,Qt.ControlModifier);QTest.qWait(20)
+  button=page.findChild(QObject,'saveJoinAddressButton');self.assertTrue(button.property('enabled'))
+  point=button.mapToScene(QPointF(button.width()/2,button.height()/2)).toPoint();QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point)
+  QTest.qWait(20);self.assertEqual(field.property('text'),'play.example.com')
+  self.assertEqual(self.manager.s['joinDisplay'],'play.example.com:25566')
+  self.assertEqual(SettingsStore(self.manager.active.store.path).data['join_address'],'play.example.com')
+  self.assertFalse(self.manager.setJoinAddress('https://example.com:25565'));self.assertEqual(self.manager.s['join_address'],'play.example.com')
+  self.manager.action('copy');self.assertEqual(app.clipboard().text(),'play.example.com:25566')
+  self.manager.addProfile('Other');self.assertTrue(self.manager.setJoinAddress('other.example.com'));self.manager.selectProfile(0)
+  QTest.qWait(20);self.assertEqual(field.property('text'),'play.example.com')
+  self.assertTrue(self.manager.setJoinAddress(''));self.assertEqual(self.manager.s['joinDisplay'],'203.0.113.20:25566')
 if __name__=='__main__':unittest.main()

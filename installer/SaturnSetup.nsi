@@ -1,4 +1,4 @@
-; Nova per-user installer. Build: makensis NovaSetup.nsi
+; Saturn per-user installer. Build: makensis SaturnSetup.nsi
 Unicode True
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
@@ -9,7 +9,7 @@ Unicode True
 !endif
 Name "Saturn Server Launcher"
 !ifndef SETUP_OUTPUT
-!define SETUP_OUTPUT "../dist/NovaSetup.exe"
+!define SETUP_OUTPUT "../dist/SaturnSetup.exe"
 !endif
 OutFile "${SETUP_OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\Saturn Server Launcher"
@@ -17,24 +17,24 @@ InstallDirRegKey HKCU "Software\NovaServerStudio" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 BrandingText "Created by Nova"
-VIProductVersion "1.0.0.17"
+VIProductVersion "1.0.0.18"
 VIAddVersionKey "ProductName" "Saturn Server Launcher"
 VIAddVersionKey "FileDescription" "Saturn Server Launcher Public Beta Setup"
-VIAddVersionKey "FileVersion" "1.0.0-beta.17"
-VIAddVersionKey "ProductVersion" "1.0.0-beta.17"
+VIAddVersionKey "FileVersion" "1.0.0-beta.18"
+VIAddVersionKey "ProductVersion" "1.0.0-beta.18"
 VIAddVersionKey "LegalCopyright" "Created by Nova"
-Icon "${PAYLOAD_DIR}/Nova.ico"
-UninstallIcon "${PAYLOAD_DIR}/Nova.ico"
+Icon "${PAYLOAD_DIR}/Saturn.ico"
+UninstallIcon "${PAYLOAD_DIR}/Saturn.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Welcome to Saturn Server Launcher"
-!define MUI_WELCOMEPAGE_TEXT "Install Saturn for your Windows account.$\r$\n$\r$\nSetup creates desktop and Start menu shortcuts and an uninstall entry.$\r$\n$\r$\nSaturn uses your existing 64-bit Python 3.10 or newer, including pip, Tcl/Tk and the Python launcher. First launch downloads Qt if needed.$\r$\n$\r$\nExit all running Nova or Saturn copies from the tray before continuing. Your server files and preferences are kept."
+!define MUI_WELCOMEPAGE_TEXT "Install Saturn for your Windows account.$\r$\n$\r$\nSetup creates desktop and Start menu shortcuts and an uninstall entry.$\r$\n$\r$\nSaturn uses your existing 64-bit Python 3.10 or newer, including pip, Tcl/Tk and the Python launcher. First launch downloads Qt if needed.$\r$\n$\r$\nExit all running Saturn copies from the tray before continuing. Your server files and preferences are kept."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "../LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Open Saturn Server Launcher"
-!define MUI_FINISHPAGE_RUN_FUNCTION StartNova
+!define MUI_FINISHPAGE_RUN_FUNCTION StartSaturn
 !define MUI_FINISHPAGE_TEXT "Saturn has been installed.$\r$\n$\r$\nUse the desktop shortcut to launch it. Software rendering is enabled by default.$\r$\n$\r$\nFirst launch may download Qt. Existing server settings and the remembered CurseForge key are reused."
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -58,20 +58,20 @@ Function .onInit
   FindWindow $0 "" "Saturn | Server Launcher"
  ${EndIf}
  ${If} $0 != 0
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Nova or Saturn is running. Right-click its tray icon and choose Exit Saturn, then click Retry." IDRETRY checkRunning
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Saturn is running. Right-click its tray icon and choose Exit Saturn, then click Retry." IDRETRY checkRunning
   Abort
  ${EndIf}
  nsExec::ExecToStack `py -3 -c "import sys,struct,tkinter,pip;sys.exit(0 if sys.version_info >= (3,10) and struct.calcsize('P') == 8 else 1)"`
  Pop $0
  Pop $1
  ${If} $0 != 0
-  MessageBox MB_OK|MB_ICONSTOP "Saturn needs 64-bit Python 3.10 or newer with pip, Tcl/Tk and the Python launcher. Install Python, then run NovaSetup again."
+  MessageBox MB_OK|MB_ICONSTOP "Saturn needs 64-bit Python 3.10 or newer with pip, Tcl/Tk and the Python launcher. Install Python, then run SaturnSetup again."
   ExecShell "open" "https://www.python.org/downloads/windows/"
   Abort
  ${EndIf}
 FunctionEnd
 
-Function StartNova
+Function StartSaturn
  SetOutPath "$INSTDIR"
  ExecShell "open" "$WINDIR\System32\wscript.exe" '$\"$INSTDIR\Launch.vbs$\"'
 FunctionEnd
@@ -91,9 +91,9 @@ File "${PAYLOAD_DIR}/Launch.pyw"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/Launch.vbs"
 SetOutPath "$INSTDIR"
-File "${PAYLOAD_DIR}/Nova.ico"
-SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/README.txt"
+SetOutPath "$INSTDIR"
+File "${PAYLOAD_DIR}/Saturn.ico"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/THIRD_PARTY_NOTICES.txt"
 SetOutPath "$INSTDIR"
@@ -117,6 +117,8 @@ File "${PAYLOAD_DIR}/engines.py"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/file_browser.py"
 SetOutPath "$INSTDIR"
+File "${PAYLOAD_DIR}/help_content.py"
+SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/host_ports.py"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/hosts.py"
@@ -131,6 +133,10 @@ File "${PAYLOAD_DIR}/port_ranges.py"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/process_manager.py"
 SetOutPath "$INSTDIR\qml"
+File "${PAYLOAD_DIR}/qml/HelpPage.qml"
+SetOutPath "$INSTDIR\qml"
+File "${PAYLOAD_DIR}/qml/JoinAddressEditor.qml"
+SetOutPath "$INSTDIR\qml"
 File "${PAYLOAD_DIR}/qml/Main.qml"
 SetOutPath "$INSTDIR\qml"
 File "${PAYLOAD_DIR}/qml/NButton.qml"
@@ -141,9 +147,9 @@ File "${PAYLOAD_DIR}/qml/NField.qml"
 SetOutPath "$INSTDIR\qml"
 File "${PAYLOAD_DIR}/qml/NTab.qml"
 SetOutPath "$INSTDIR\qml"
-File "${PAYLOAD_DIR}/qml/NovaMark.qml"
-SetOutPath "$INSTDIR\qml"
 File "${PAYLOAD_DIR}/qml/Panel.qml"
+SetOutPath "$INSTDIR\qml"
+File "${PAYLOAD_DIR}/qml/SaturnMark.qml"
 SetOutPath "$INSTDIR\qml"
 File "${PAYLOAD_DIR}/qml/StartupScene.qml"
 SetOutPath "$INSTDIR\qml"
@@ -191,21 +197,21 @@ File "${PAYLOAD_DIR}/updater.py"
 SetOutPath "$INSTDIR"
 File "${PAYLOAD_DIR}/vps_setup.sh"
  SetOutPath "$INSTDIR"
- File /oname=Installer-Source.nsi "NovaSetup.nsi"
+ File /oname=Installer-Source.nsi "SaturnSetup.nsi"
  WriteUninstaller "$INSTDIR\Uninstall.exe"
  Delete "$DESKTOP\Nova Server Studio.lnk"
  Delete "$SMPROGRAMS\Nova Server Studio\Nova Server Studio.lnk"
  Delete "$SMPROGRAMS\Nova Server Studio\Uninstall Nova.lnk"
  RMDir "$SMPROGRAMS\Nova Server Studio"
  CreateDirectory "$SMPROGRAMS\Saturn Server Launcher"
- CreateShortcut "$DESKTOP\Saturn Server Launcher.lnk" "$WINDIR\System32\wscript.exe" '$\"$INSTDIR\Launch.vbs$\"' "$INSTDIR\Nova.ico"
- CreateShortcut "$SMPROGRAMS\Saturn Server Launcher\Saturn Server Launcher.lnk" "$WINDIR\System32\wscript.exe" '$\"$INSTDIR\Launch.vbs$\"' "$INSTDIR\Nova.ico"
+ CreateShortcut "$DESKTOP\Saturn Server Launcher.lnk" "$WINDIR\System32\wscript.exe" '$\"$INSTDIR\Launch.vbs$\"' "$INSTDIR\Saturn.ico"
+ CreateShortcut "$SMPROGRAMS\Saturn Server Launcher\Saturn Server Launcher.lnk" "$WINDIR\System32\wscript.exe" '$\"$INSTDIR\Launch.vbs$\"' "$INSTDIR\Saturn.ico"
  CreateShortcut "$SMPROGRAMS\Saturn Server Launcher\Uninstall Saturn.lnk" "$INSTDIR\Uninstall.exe"
  WriteRegStr HKCU "Software\NovaServerStudio" "InstallDir" "$INSTDIR"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "DisplayName" "Saturn Server Launcher"
- WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "DisplayVersion" "1.0.0-beta.17"
+ WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "DisplayVersion" "1.0.0-beta.18"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "Publisher" "Nova"
- WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "DisplayIcon" "$INSTDIR\Nova.ico"
+ WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "DisplayIcon" "$INSTDIR\Saturn.ico"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "InstallLocation" "$INSTDIR"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NovaServerStudio" "NoModify" 1
@@ -221,7 +227,7 @@ Function un.onInit
   FindWindow $0 "" "Saturn | Server Launcher"
  ${EndIf}
  ${If} $0 != 0
-  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Exit Nova or Saturn from its tray icon before uninstalling, then click Retry." IDRETRY checkRunning
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Exit Saturn from its tray icon before uninstalling, then click Retry." IDRETRY checkRunning
   Abort
  ${EndIf}
 FunctionEnd
@@ -235,8 +241,8 @@ Delete "$INSTDIR\LICENSE.txt"
 Delete "$INSTDIR\Launch.bat"
 Delete "$INSTDIR\Launch.pyw"
 Delete "$INSTDIR\Launch.vbs"
-Delete "$INSTDIR\Nova.ico"
 Delete "$INSTDIR\README.txt"
+Delete "$INSTDIR\Saturn.ico"
 Delete "$INSTDIR\THIRD_PARTY_NOTICES.txt"
 Delete "$INSTDIR\app.py"
 Delete "$INSTDIR\__pycache__\app.cpython-*.pyc"
@@ -258,6 +264,8 @@ Delete "$INSTDIR\engines.py"
 Delete "$INSTDIR\__pycache__\engines.cpython-*.pyc"
 Delete "$INSTDIR\file_browser.py"
 Delete "$INSTDIR\__pycache__\file_browser.cpython-*.pyc"
+Delete "$INSTDIR\help_content.py"
+Delete "$INSTDIR\__pycache__\help_content.cpython-*.pyc"
 Delete "$INSTDIR\host_ports.py"
 Delete "$INSTDIR\__pycache__\host_ports.cpython-*.pyc"
 Delete "$INSTDIR\hosts.py"
@@ -271,13 +279,15 @@ Delete "$INSTDIR\port_ranges.py"
 Delete "$INSTDIR\__pycache__\port_ranges.cpython-*.pyc"
 Delete "$INSTDIR\process_manager.py"
 Delete "$INSTDIR\__pycache__\process_manager.cpython-*.pyc"
+Delete "$INSTDIR\qml\HelpPage.qml"
+Delete "$INSTDIR\qml\JoinAddressEditor.qml"
 Delete "$INSTDIR\qml\Main.qml"
 Delete "$INSTDIR\qml\NButton.qml"
 Delete "$INSTDIR\qml\NCombo.qml"
 Delete "$INSTDIR\qml\NField.qml"
 Delete "$INSTDIR\qml\NTab.qml"
-Delete "$INSTDIR\qml\NovaMark.qml"
 Delete "$INSTDIR\qml\Panel.qml"
+Delete "$INSTDIR\qml\SaturnMark.qml"
 Delete "$INSTDIR\qml\StartupScene.qml"
 Delete "$INSTDIR\qml\UiSounds.qml"
 Delete "$INSTDIR\qt_app.py"

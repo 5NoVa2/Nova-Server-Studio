@@ -22,7 +22,7 @@ def ensure_tray(log):
     with managed_popen([str(python),'-m','pip','install','--disable-pip-version-check','--no-input','--target',str(vendor),'pystray>=0.19.5,<1','Pillow>=10,<13'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0)) as proc:
         for line in proc.stdout:log(line.rstrip())
         code=proc.wait()
-    if code:raise ValueError('Tray support could not be installed. Nova will minimize to the taskbar instead.')
+    if code:raise ValueError('Tray support could not be installed. Saturn will minimize to the taskbar instead.')
     check_cancelled();importlib.invalidate_caches()
     return importlib.import_module('pystray'),importlib.import_module('PIL.Image'),importlib.import_module('PIL.ImageDraw')
 
@@ -40,12 +40,12 @@ class Tray:
             bitmap=image.new('RGBA',(64,64),(0,0,0,0));pen=draw.Draw(bitmap)
             pen.rounded_rectangle((3,3,61,61),radius=14,fill='#d9deea')
             pen.line([(19,46),(19,18),(45,46),(45,18)],fill='#0b101b',width=7,joint='curve')
-            self.icon=pystray.Icon('NovaServerStudio',bitmap,'Nova — server and tunnel manager',pystray.Menu(
-                pystray.MenuItem('Open Nova',lambda icon,item:self.dispatch(self.show),default=True),
-                pystray.MenuItem('Exit Nova (stop server and tunnel)',lambda icon,item:self.dispatch(self.exit_app))))
+            self.icon=pystray.Icon('NovaServerStudio',bitmap,'Saturn — server and tunnel manager',pystray.Menu(
+                pystray.MenuItem('Open Saturn',lambda icon,item:self.dispatch(self.show),default=True),
+                pystray.MenuItem('Exit Saturn (stop server and tunnel)',lambda icon,item:self.dispatch(self.exit_app))))
             def setup(icon):
                 if self.stopping.is_set():icon.stop();return
-                icon.visible=True;self.ready.set();self.log('Nova tray icon ready. X keeps hosting in the background.');self.dispatch(self.on_ready)
+                icon.visible=True;self.ready.set();self.log('Saturn tray icon ready. X keeps hosting in the background.');self.dispatch(self.on_ready)
             self.icon.run(setup=setup)
         except Exception as error:
             if not self.stopping.is_set():self.log('Tray unavailable: '+str(error)+'. Minimize uses the taskbar.')

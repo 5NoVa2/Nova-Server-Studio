@@ -141,7 +141,7 @@ class BubbleNotebook(ttk.Frame):
         if isinstance(tab_id,int):return self.pages[tab_id][0]
         for child,text,button in self.pages:
             if tab_id is child or str(tab_id)==str(child):return child
-        raise tk.TclError('Unknown Nova page')
+        raise tk.TclError('Unknown Saturn page')
     def tab(self,tab_id,option=None,**kwargs):
         child=self.resolve(tab_id);text=next(text for page,text,button in self.pages if page is child)
         return text if option=='text' else {'text':text}
@@ -153,7 +153,7 @@ class BubbleNotebook(ttk.Frame):
 
 
 class Launcher(tk.Canvas):
-    """Original Nova artwork and motion, inspired by the supplied visual reference."""
+    """Original Saturn artwork and motion, inspired by the supplied visual reference."""
     def __init__(self,parent,actions,**kwargs):
         super().__init__(parent,background=BG,highlightthickness=0,borderwidth=0,**kwargs)
         self.actions=actions;self.levels=[0.0]*len(actions);self.hover=-1;self.started=time.monotonic();self.job=None;self.pointer=(.5,.5)

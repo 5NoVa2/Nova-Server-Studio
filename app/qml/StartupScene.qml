@@ -121,7 +121,7 @@ Rectangle {
         y: scene.height*0.43-height/2; width: 360; height: 270
         opacity: scene.clamp((scene.phase-0.48)/0.19)
         scale: 1.04-scene.clamp((scene.phase-0.48)/0.22)*0.04
-        NovaMark { anchors.fill: parent }
+        SaturnMark { anchors.fill: parent }
     }
     Column {
         anchors.horizontalCenter: parent.horizontalCenter; y: scene.height*0.43+128

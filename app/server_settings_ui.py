@@ -27,7 +27,7 @@ class ServerSettings:
         if embedded:
             self.window=ttk.Frame(parent);self.window.pack(fill='both',expand=True)
         else:
-            self.window=tk.Toplevel(parent);apply_theme(self.window);self.window.title('Nova | Server settings');self.window.geometry('990x760');self.window.minsize(860,650)
+            self.window=tk.Toplevel(parent);apply_theme(self.window);self.window.title('Saturn | Server settings');self.window.geometry('990x760');self.window.minsize(860,650)
         shell=ttk.Frame(self.window,padding=18);shell.pack(fill='both',expand=True)
         header=ttk.Frame(shell);header.pack(fill='x')
         title=ttk.Frame(header);title.pack(side='left')

@@ -7,7 +7,7 @@ folder=Path(os.environ.get('LOCALAPPDATA',str(Path.home()/'.cache')))/'MCServerS
 folder.mkdir(parents=True,exist_ok=True)
 log=(folder/'app.log').open('a',encoding='utf-8',buffering=1)
 sys.stdout=log;sys.stderr=log
-print('Saturn 1.0.0-beta.17 startup: '+str(Path(__file__).resolve()))
+print('Saturn 1.0.0-beta.18 startup: '+str(Path(__file__).resolve()))
 print('Python: '+sys.executable+' | Qt renderer: '+os.environ.get('QT_QUICK_BACKEND',''))
 qt=folder/'qt-libs';activate_runtime(qt)
 

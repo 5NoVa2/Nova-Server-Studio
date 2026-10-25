@@ -1,4 +1,4 @@
-"""Independent running server profiles, with one shared Nova window."""
+"""Independent running server profiles, with one shared Saturn window."""
 import json,os,tempfile,threading,time,uuid
 from pathlib import Path
 from PySide6.QtCore import QObject,Property,Signal,Slot,Qt
@@ -160,7 +160,7 @@ class HostManager(QObject):
                 identifier=self.entries[self.current]['id'];session.timer.stop();session.api_save_timer.stop()
                 self.entries.pop(self.current);self.current=min(self.current,len(self.entries)-1);self.registry_save();self.sessions.pop(identifier)
                 self.apiKeyChanged.emit();self.credentialsChanged.emit();self.changed.emit()
-            session.confirm('Remove server profile?','This removes the profile from Nova. Its server folder, worlds and backups remain.',remove)
+            session.confirm('Remove server profile?','This removes the profile from Saturn. Its server folder, worlds and backups remain.',remove)
         except Exception as e:self.active.error(e)
     def preflight(self,session,for_tunnel=False):
         from connection_settings import port
@@ -342,6 +342,8 @@ class HostManager(QObject):
     def browse(self,key):self.active.browse(key)
     @Slot(str)
     def command(self,text):self.active.command(text)
+    @Slot(str,result=bool)
+    def setJoinAddress(self,value):return self.active.setJoinAddress(value)
     @Slot(str,str)
     def setPath(self,key,value):self.active.setPath(key,value)
     @Slot(str)

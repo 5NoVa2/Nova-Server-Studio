@@ -6,7 +6,7 @@ import updater
 
 
 def release(tag,**values):
- row={'tag_name':tag,'draft':False,'prerelease':'beta' in tag,'body':'Changes','assets':[{'name':name,'browser_download_url':f'https://github.com/{updater.REPO}/releases/download/{tag}/{name}'} for name in ('NovaSetup.exe','SHA256SUMS.txt')]}
+ row={'tag_name':tag,'draft':False,'prerelease':'beta' in tag,'body':'Changes','assets':[{'name':name,'browser_download_url':f'https://github.com/{updater.REPO}/releases/download/{tag}/{name}'} for name in ('SaturnSetup.exe','SHA256SUMS.txt')]}
  row.update(values);return row
 
 class UpdaterTests(unittest.TestCase):
@@ -20,16 +20,16 @@ class UpdaterTests(unittest.TestCase):
  def test_missing_assets_and_unknown_tags_are_skipped(self):
   self.assertIsNone(updater.select_release([release('v1.0.1',assets=[]),release('unsafe')] ,'1.0.0'))
  def test_foreign_or_insecure_asset_urls_rejected(self):
-  for url in ('http://github.com/x','https://evil.test/NovaSetup.exe','https://github.com/other/repo/releases/download/v1.0.1/NovaSetup.exe'):
-   with self.assertRaises(ValueError):updater.asset_url(url,'v1.0.1','NovaSetup.exe')
+  for url in ('http://github.com/x','https://evil.test/SaturnSetup.exe','https://github.com/other/repo/releases/download/v1.0.1/SaturnSetup.exe'):
+   with self.assertRaises(ValueError):updater.asset_url(url,'v1.0.1','SaturnSetup.exe')
  def test_checksum_requires_unique_exact_filename(self):
   digest='a'*64
-  self.assertEqual(updater.installer_checksum((digest+'  NovaSetup.exe\n').encode()),digest)
-  for data in ('bad  NovaSetup.exe',digest+' other.exe',(digest+' NovaSetup.exe\n')*2):
+  self.assertEqual(updater.installer_checksum((digest+'  SaturnSetup.exe\n').encode()),digest)
+  for data in ('bad  SaturnSetup.exe',digest+' other.exe',(digest+' SaturnSetup.exe\n')*2):
    with self.assertRaises(ValueError):updater.installer_checksum(data.encode())
  def test_verified_download_and_corruption_cleanup(self):
   info=updater.select_release([release('v1.0.1')],'1.0.0');data=b'MZinstaller';digest=hashlib.sha256(data).hexdigest()
-  with tempfile.TemporaryDirectory() as temp,patch.object(updater,'fetch_bytes',return_value=(digest+'  NovaSetup.exe\n').encode()):
+  with tempfile.TemporaryDirectory() as temp,patch.object(updater,'fetch_bytes',return_value=(digest+'  SaturnSetup.exe\n').encode()):
    with patch.object(updater,'urlopen',return_value=io.BytesIO(data)):
     path,expected=updater.download_update(info,temp);self.assertEqual(expected,digest);self.assertEqual(Path(path).read_bytes(),data)
    with patch.object(updater,'urlopen',return_value=io.BytesIO(b'MZcorrupt')):

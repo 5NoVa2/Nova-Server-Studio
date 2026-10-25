@@ -1,10 +1,7 @@
-SATURN SERVER LAUNCHER 1.0.0-beta.17 - Windows x64
+Saturn Server Launcher
 Created by Nova. Free and open source under MIT.
 
-Exit Saturn / Nova from the tray, then install NovaSetup.exe over the existing location. The installer asset name stays NovaSetup.exe for compatibility with existing updates. Your profiles, worlds and preferences remain.
+Exit Saturn from the tray, then install SaturnSetup.exe over the existing location. Your profiles, worlds and preferences remain.
+Download: https://github.com/5NoVa2/Saturn-Server-Launcher/releases
 
-Requires 64-bit Python 3.10+ with pip, Tcl/Tk and Python launcher. First launch downloads Qt.
-
-Settings > Domain & display has the master sound switch, volume and startup controls. Settings > Environment selects Java per profile. Tasks supports saved schedules.
-
-Read the repository README for VPS setup, backup behavior and beta limitations.
+Requires Windows 10 or newer and 64-bit Python 3.10+ with pip, Tcl/Tk and the Python launcher. First launch prepares Qt if needed.

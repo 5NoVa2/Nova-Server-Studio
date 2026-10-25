@@ -1,4 +1,4 @@
-"""Nova dark theme, implemented with standard-library Tk/ttk."""
+"""Saturn dark theme, implemented with standard-library Tk/ttk."""
 from tkinter import ttk,font as tkfont
 
 BG='#08090c'
