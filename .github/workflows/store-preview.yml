@@ -1,0 +1,32 @@
+name: Store package preview
+on:
+  push:
+    branches: [store-preparation]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Build bundled app and validated preview MSIX
+        shell: pwsh
+        run: ./store/build_store.ps1 -Preview
+      - name: Upload build and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saturn-Store-Preview
+          path: |
+            store-output/*.msix
+            store-output/SHA256SUMS.txt
+            store-work/smoke-state/MCServerSwitcher/app.log
+            store-work/smoke-state/MCServerSwitcher/store-smoke.json
+          if-no-files-found: warn
+          retention-days: 14

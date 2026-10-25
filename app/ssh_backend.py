@@ -10,6 +10,7 @@ import sys
 import threading
 from pathlib import Path
 from runtime import CACHE
+from distribution import STORE_BUILD
 
 
 _dependency_lock=threading.Lock()
@@ -23,6 +24,9 @@ def ensure_ssh(log):
     finally:_dependency_lock.release()
 
 def _ensure_ssh(log):
+    if STORE_BUILD:
+        try:return importlib.import_module('paramiko')
+        except ImportError as error:raise RuntimeError('Bundled SSH support is missing. Repair Saturn through Microsoft Store.') from error
     vendor=CACHE/'ssh-libs'
     if str(vendor) not in sys.path:sys.path.insert(0,str(vendor))
     try:return importlib.import_module('paramiko')

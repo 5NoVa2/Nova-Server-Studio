@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request,urlopen
 from process_manager import check_cancelled
+from distribution import STORE_BUILD
 
 VERSION='1.0.0-beta.17'
 PRIVATE_BUILD=False
@@ -48,7 +49,9 @@ def fetch_bytes(url,limit):
     check_cancelled();return data
 
 
-def check_updates():return select_release(json.loads(fetch_bytes(API,4*1024**2)))
+def check_updates():
+    if STORE_BUILD:raise ValueError('Updates are managed by Microsoft Store.')
+    return select_release(json.loads(fetch_bytes(API,4*1024**2)))
 
 
 def installer_checksum(data):
@@ -61,6 +64,7 @@ def installer_checksum(data):
 
 
 def download_update(release,cache):
+    if STORE_BUILD:raise ValueError('Updates are managed by Microsoft Store.')
     tag=release['version'];asset_url(release['installer'],tag,'NovaSetup.exe');asset_url(release['checksums'],tag,'SHA256SUMS.txt')
     expected=installer_checksum(fetch_bytes(release['checksums'],65536))
     parent=Path(cache)/'updates';parent.mkdir(parents=True,exist_ok=True)
@@ -82,6 +86,7 @@ def download_update(release,cache):
 
 
 def launch_after_exit(path,expected,pid=None):
+    if STORE_BUILD:raise ValueError('Updates are managed by Microsoft Store.')
     if os.name!='nt':raise ValueError('Automatic installation is supported on Windows only.')
     path=Path(path).resolve()
     if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise ValueError('Installer changed. Download it again.')
