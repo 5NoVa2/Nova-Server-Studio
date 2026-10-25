@@ -20,6 +20,12 @@ network must allow the outbound tunnel. This does not guarantee anonymity.
 - Particle startup scene, soft pings and tonal transitions; master mute and volume.
 - Public update checks restored, plus an isolated installer build with NSIS CRC validation.
 
+## Code signing policy
+
+See the [Code signing policy](docs/CODE_SIGNING.md) and
+[Privacy policy](docs/PRIVACY.md). SignPath onboarding is being prepared;
+acceptance has not been granted and existing releases remain unsigned.
+
 ## Install or upgrade
 
 1. Install **64-bit Python 3.10+** with pip, Tcl/Tk and the Python launcher.
