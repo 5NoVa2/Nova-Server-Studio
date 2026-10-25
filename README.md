@@ -2,7 +2,7 @@
 
 Free, open-source Minecraft server management for Windows. Created by **Nova**.
 
-**First public beta: 1.0.0-beta.1.** Local hosting, multiple independent server
+**First public beta: 1.0.0-beta.2.** Local hosting, multiple independent server
 profiles, and optional reverse SSH hosting through a VPS—all in one window.
 
 ## Features
@@ -131,3 +131,5 @@ and downloaded game/server files retain their own licenses and terms; see
 
 Not an official Minecraft product. Not approved by or associated with Mojang
 or Microsoft. Minecraft is a trademark of its respective owners.
+
+See RELEASE_NOTES.md for the beta.2 save, performance, version-selector and backup restore changes.

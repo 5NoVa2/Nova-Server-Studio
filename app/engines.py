@@ -26,17 +26,22 @@ def available_versions(kind):
         groups=net.get_json('https://fill.papermc.io/v3/projects/paper')['versions']
         return [v for group in groups.values() for v in group]
     if kind=='Forge':
-        promos=net.get_json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')['promos']
-        versions=list(dict.fromkeys(k.rsplit('-',1)[0] for k in promos))
+        # Promotions only include recommended builds, omitting many versions.
+        from urllib.request import urlopen
+        import xml.etree.ElementTree as ET
+        with urlopen('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml',timeout=60) as response:
+            data=response.read(8*1024**2)
+        versions=set(v.text.split('-',1)[0] for v in ET.fromstring(data).findall('./versioning/versions/version') if v.text and re.fullmatch(r'\d+(?:\.\d+)+',v.text.split('-',1)[0]))
         return sorted(versions,key=lambda v:tuple(int(x) for x in v.split('.')),reverse=True)
-    return [v['id'] for v in net.get_json(net.MANIFEST)['versions'] if v['type']=='release']
+    versions=net.get_json(net.MANIFEST)['versions']
+    return [v['id'] for v in versions if kind=='Vanilla' or v['type']=='release']
 
 
 def metadata(version):
     manifest=net.get_json(net.MANIFEST)
     if version.strip().lower()=='latest':version=manifest['latest']['release']
-    entry=next((v for v in manifest['versions'] if v['id']==version and v['type']=='release'),None)
-    if not entry:raise ValueError('Enter latest or an exact stable Minecraft version.')
+    entry=next((v for v in manifest['versions'] if v['id']==version),None)
+    if not entry:raise ValueError('Choose a listed Minecraft version or latest.')
     return version,net.get_json(entry['url'])
 
 
@@ -223,7 +228,9 @@ def setup_engine(kind,target,version,loader,ram,log,selection=None,key=''):
             java=net.get_java(major,log,image='jdk' if kind=='Spigot' else 'jre')
             args=['-jar','server.jar','nogui']
             if kind=='Vanilla':
-                jar=vm['downloads']['server'];net.download(jar['url'],folder/'server.jar','sha1',jar['sha1'])
+                jar=vm.get('downloads',{}).get('server')
+                if not jar:raise ValueError('Mojang does not provide a dedicated server download for this historical version. Choose another version.')
+                net.download(jar['url'],folder/'server.jar','sha1',jar['sha1'])
             elif kind=='Paper':
                 builds=net.get_json(f'https://fill.papermc.io/v3/projects/paper/versions/{version}/builds')
                 stable=next((b for b in builds if b.get('channel')=='STABLE'),None)

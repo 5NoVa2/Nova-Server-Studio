@@ -21,8 +21,9 @@ class Bridge(QObject):
     def __init__(self, app, profile_id="main", owner=None):
         super().__init__(); self.app=app; self.window=None;self.owner=owner;self.profile_id=profile_id
         self.store=SettingsStore(CACHE/'settings.json' if profile_id=='main' else CACHE/'profiles'/profile_id/'settings.json');self.store.data.setdefault('reduced',False)
-        self.s=dict(self.store.data, busy=False, activity='Ready', error='', logs='', server='Stopped', tunnel='Disconnected', uptime='—', versions=['latest'], packs=[], releases=[], mods=[], project={}, releaseIndex=0, pageIndex=0, files=[], addons=[], editor='', file='', dirty=False, properties={}, dialog='', dialogTitle='', exiting=False, reduced=bool(self.store.data.get('reduced',False)))
+        self.s=dict(self.store.data, busy=False, activity='Ready', error='', logs='', server='Stopped', tunnel='Disconnected', uptime='—', versions=['latest'], packs=[], releases=[], mods=[], project={}, releaseIndex=0, pageIndex=0, files=[], backups=[], addons=[], editor='', file='', dirty=False, properties={}, dialog='', dialogTitle='', exiting=False, reduced=bool(self.store.data.get('reduced',False)))
         self.s.update(players=[],agreed=False,propertyDirty=False,filesLoaded=False,installedEngine='',joinDisplay=self.s['join_address'])
+        self.log_lock=threading.Lock();self.log_pending=[]
         self.properties_original={};self.last_files_scan=0;self.last_player_poll=0;self.loaded_folder=None;self.folder_editing=False
         from players import PlayerTracker
         self.player_tracker=PlayerTracker()
@@ -69,12 +70,19 @@ class Bridge(QObject):
         except Exception as e:self.error('Could not remove CurseForge key: '+str(e))
     @Slot(object)
     def deliver(self,fn):fn()
-    def publish(self,**values):self.s.update(values);self.changed.emit()
+    def publish(self,**values):
+        if any(self.s.get(k)!=v for k,v in values.items()):
+            self.s.update(values);self.changed.emit()
     def log(self,message):
-        def write():
-            names=self.player_tracker.consume(str(message)) if self.active(self.server) else self.s['players']
-            self.publish(logs=(self.s['logs']+str(message)+'\n')[-180000:],players=names)
-        self.posted.emit(write)
+        with self.log_lock:self.log_pending.append(str(message))
+    def flush_logs(self):
+        with self.log_lock:
+            messages=self.log_pending;self.log_pending=[]
+        if not messages:return
+        names=self.s['players']
+        if self.active(self.server):
+            for message in messages:names=self.player_tracker.consume(message)
+        self.publish(logs=(self.s['logs']+'\n'.join(messages)+'\n')[-180000:],players=names)
     def error(self,error):self.publish(error=str(error),activity='Needs attention');self.log('ERROR: '+str(error))
     def active(self,proc):return proc is not None and proc.poll() is None
     @Slot(str,'QVariant')
@@ -166,12 +174,19 @@ class Bridge(QObject):
         try:
             if name=='dismiss':self.publish(error='');return
             if name=='save':self.save();return
+            if name=='save_all':self.save_all();return
             if name=='copy':
                 self.app.clipboard().setText((self.s['join_address'] or self.s['vps_host'] or 'localhost') if self.tunnel_kind()=='Bedrock' else self.join_display())
                 self.log('Join address copied.'+(' Bedrock port: '+str(self.s['remote_bedrock_port']) if self.tunnel_kind()=='Bedrock' else ''));return
+            if name=='ensure_versions':
+                if getattr(self,'versions_engine',None)==self.s['engine'] or self.s['busy']:return
+                name='versions'
             if name=='versions':
                 from engines import available_versions
-                kind=self.s['engine'];self.task('Fetching versions…',lambda:available_versions(kind),lambda rows:self.publish(versions=['latest']+rows));return
+                kind=self.s['engine']
+                def loaded(rows):
+                    self.versions_engine=kind;self.publish(versions=list(dict.fromkeys(['latest']+rows)))
+                self.task('Fetching versions…',lambda:available_versions(kind),loaded);return
             if name=='install':
                 self.stopped()
                 if not self.s.get('agreed'):raise ValueError('Read and accept the Minecraft EULA before installation.')
@@ -180,7 +195,9 @@ class Bridge(QObject):
                 self.confirm('Replace every server file?',target+'\n\nThis deletes the old world, mods and configuration. Backups are manual. Stop any server launched outside Nova first.',lambda yes:self.task('Installing '+kind+'…',lambda:setup_engine(kind,target,version,loader,ram,self.log,selection,key),self.installed) if yes else None);return
             if name=='backup':
                 self.stopped();from app import manual_backup
-                target=self.s['folder'];self.task('Making manual backup…',lambda:manual_backup(target),lambda result:self.log('Backup saved: '+str(result)));return
+                self.save_all();target=self.s['folder']
+                def backed_up(result):self.log('Backup saved: '+str(result));self.refresh_backups()
+                self.task('Making manual backup…',lambda:manual_backup(target),backed_up);return
             if name=='zip':
                 self.stopped();from app import install
                 archive=self.s.get('archive','');url=self.s.get('archiveUrl','').strip();target=self.s['folder']
@@ -236,6 +253,7 @@ class Bridge(QObject):
                     self.confirm('Discard unsaved settings?','Reloading replaces unsaved server settings.',lambda yes:self.load_files() if yes else None)
                 else:self.load_files()
                 return
+            if name=='backups':self.refresh_backups();return
             if name=='ensure_files':self.refresh_files();return
             if name=='write':self.write_file();return
             if name=='properties':self.save_properties();return
@@ -261,7 +279,7 @@ class Bridge(QObject):
     def credentials(self):return (self.s['key'],self.secrets['password'],self.secrets['passphrase'])
     def start_server(self):
         if self.active(self.server):return
-        if self.s['dirty'] or self.s['propertyDirty']:raise ValueError('Save your file and server settings edits before starting.')
+        if self.s['dirty'] or self.s['propertyDirty']:self.save_all()
         if self.owner:self.owner.preflight(self)
         self.apply_ports()
         folder=Path(self.s['folder']).expanduser().resolve();state=json.loads((folder/'switcher-server.json').read_text())
@@ -316,6 +334,7 @@ class Bridge(QObject):
         if self.active(self.tunnel):self.tunnel.terminate()
         if self.active(self.server):self.command('stop');self.log('Saving world and stopping…')
     def tick(self):
+        self.flush_logs()
         running=self.active(self.server);tunnel=self.active(self.tunnel)
         elapsed=int(time.monotonic()-self.started) if running else 0
         self.publish(server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel='Connected' if tunnel else 'Disconnected',uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
@@ -359,7 +378,7 @@ class Bridge(QObject):
         self.editor_meta=None;self.editor_files=None;self.properties_doc=None
         self.publish(editor='',file='',dirty=False,propertyDirty=False)
         if (Path(self.s['folder'])/'switcher-server.json').exists():self.apply_ports()
-        self.load_files()
+        self.load_files();self.save();self.refresh_backups()
     def refresh_files(self):
         if self.s['busy'] or self.folder_editing:return
         try:
@@ -412,7 +431,54 @@ class Bridge(QObject):
         if self.s['busy']:raise ValueError('Wait for current work to finish.')
         if not self.properties_doc:raise ValueError('Reload files first.')
         if self.properties_doc.path.parent!=Path(self.s['folder']).expanduser().resolve():raise ValueError('Reload the server folder first.')
-        self.properties_doc.save(self.s['properties']);self.log('Server settings saved.');self.load_files()
+        self.save_all();self.log('Server settings saved.')
+    def save_all(self):
+        self.stopped()
+        if self.s['busy']:raise ValueError('Wait for current work to finish.')
+        from server_files import Properties,fingerprint
+        dirty=self.s['dirty'];prop_dirty=self.s['propertyDirty']
+        updates={k:v for k,v in self.s['properties'].items() if self.properties_original.get(k)!=v} if prop_dirty else {}
+        if prop_dirty:
+            if not self.properties_doc or self.properties_doc.path.parent!=Path(self.s['folder']).expanduser().resolve():
+                raise ValueError('Reload the server folder first.')
+            current=self.properties_doc.path.read_bytes() if self.properties_doc.path.exists() else None
+            if fingerprint(current)!=fingerprint(self.properties_doc.original):raise ValueError('Server settings changed on disk. Reload before saving.')
+        if dirty and self.s['file']=='server.properties' and prop_dirty:
+            # Merge independent edits made in the raw editor and settings form.
+            edited=Properties(self.properties_doc.path);edited.text=self.s['editor'];edited.values={}
+            for raw,line in edited.iter_records():
+                pair=edited.parse(line)
+                if pair:edited.values[pair[0]]=pair[1]
+            for key,value in updates.items():
+                raw_value=edited.values.get(key)
+                if raw_value!=self.properties_original.get(key) and raw_value!=value:
+                    raise ValueError('Conflicting edits for '+key+'. Use the same value in the editor and Server settings.')
+        if dirty:self.write_file()
+        if prop_dirty:
+            doc=Properties(self.properties_doc.path) if dirty and self.s['file']=='server.properties' else self.properties_doc
+            doc.save(updates)
+        if not self.save():raise ValueError('Could not save preferences.')
+        self.publish(propertyDirty=False)
+        self.load_files(preserve=True)
+        if dirty or prop_dirty:self.log('All file and server settings changes saved.')
+    def refresh_backups(self):
+        from backups import list_backups
+        self.publish(backups=list_backups(self.s['folder']))
+    @Slot(str)
+    def restoreBackup(self,path):
+        try:
+            self.stopped()
+            if self.s['busy']:raise ValueError('Wait for current work to finish.')
+            from backups import list_backups,restore_backup
+            target=self.s['folder']
+            if path not in {row['path'] for row in list_backups(target)}:raise ValueError('Choose a listed backup.')
+            def restore(yes):
+                if not yes:return
+                self.stopped()
+                if self.s['folder']!=target:raise ValueError('Server profile changed. Select the backup again.')
+                self.task('Restoring backup…',lambda:restore_backup(target,path),self.installed)
+            self.confirm('Restore this backup?',Path(path).name+'\n\nThis replaces the current world, mods and settings, including unsaved edits. The selected backup stays available. No automatic backup is made.',restore)
+        except Exception as e:self.error(e)
     @Slot(str,str,str)
     def addon(self,operation,kind,name):
         try:
@@ -420,7 +486,10 @@ class Bridge(QObject):
             if self.s['busy']:raise ValueError('Wait for current work to finish.')
             from server_files import ServerFiles
             files=ServerFiles(self.s['folder'])
-            def perform():getattr(files,operation)(kind,name);self.load_files()
+            def perform():
+                self.save_all()
+                def run():return getattr(files,operation)(kind,name)
+                self.task('Updating add-on…',run,lambda result:self.load_files(preserve=True))
             if operation=='remove':self.confirm('Remove add-on?',name,lambda yes:perform() if yes else None)
             elif operation in ('toggle','add'):perform()
         except Exception as e:self.error(e)

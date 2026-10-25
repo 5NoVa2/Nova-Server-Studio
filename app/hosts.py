@@ -182,6 +182,8 @@ class HostManager(QObject):
         peers=[s for s in self.sessions.values() if s.s['vps_host'] and Connection.parse(s.s).vps_host==connection.vps_host and s.s['ssh_username']==connection.ssh_username]
         return [s.s['remote_java_port'] for s in peers],[s.s['remote_bedrock_port'] for s in peers]
     @Slot(str)
+    def restoreBackup(self,path):self.active.restoreBackup(path)
+    @Slot(str)
     def action(self,name):
         if name=='exit':self.exit();return
         if name=='tray':self.minimize();return

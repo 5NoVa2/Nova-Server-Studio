@@ -54,6 +54,69 @@ class PublicBuildTests(unittest.TestCase):
   for index in range(6):window.setProperty('page',index);QTest.qWait(30)
   self.assertFalse(window.grabWindow().isNull());self.assertEqual(QQuickWindow.sceneGraphBackend(),'software')
   shiboken6.delete(engine)
+ def prepared(self):
+  bridge=self.manager.active;folder=Path(self.temp.name)/'installed';folder.mkdir()
+  (folder/'server.properties').write_text('motd=Original\nmax-players=20\n')
+  (folder/'switcher-server.json').write_text('{"engine":"Forge"}')
+  bridge.s['folder']=str(folder);bridge.installed();return bridge,folder
+ def test_only_vital_files_without_recursive_scan(self):
+  from server_files import ServerFiles
+  bridge,folder=self.prepared();(folder/'config').mkdir();(folder/'config'/'a-mod.toml').write_text('a=1')
+  (folder/'config'/'paper-global.yml').write_text('version: 1')
+  with patch('os.walk',side_effect=AssertionError('recursive scan')):
+   self.assertEqual(ServerFiles(folder).config_files(),['config/paper-global.yml','server.properties'])
+ def test_creation_and_addon_reload_stay_clean(self):
+  bridge,folder=self.prepared();self.assertFalse(bridge.s['dirty']);self.assertFalse(bridge.s['propertyDirty'])
+  bridge.load_files(preserve=True);self.assertFalse(bridge.s['dirty'])
+ def test_save_all_merges_editor_and_settings(self):
+  bridge,folder=self.prepared()
+  bridge.update('editor',bridge.s['editor'].replace('motd=Original','motd=Edited'))
+  bridge.property_value('max-players','35');bridge.save_all()
+  content=(folder/'server.properties').read_text();self.assertIn('motd=Edited',content);self.assertIn('max-players=35',content)
+  self.assertFalse(bridge.s['dirty']);self.assertFalse(bridge.s['propertyDirty'])
+ def test_save_all_rejects_conflicting_edits_and_external_changes(self):
+  bridge,folder=self.prepared();bridge.update('editor',bridge.s['editor'].replace('motd=Original','motd=Raw'))
+  bridge.property_value('motd','Form')
+  with self.assertRaisesRegex(ValueError,'Conflicting'):bridge.save_all()
+  self.assertIn('motd=Original',(folder/'server.properties').read_text())
+  (folder/'server.properties').write_text('motd=External\n')
+  with self.assertRaisesRegex(ValueError,'changed on disk'):bridge.save_all()
+ def test_no_state_notification_for_unchanged_values(self):
+  bridge=self.manager.active;calls=[];bridge.changed.connect(lambda:calls.append(1))
+  bridge.publish(busy=False);self.assertEqual(calls,[])
+ def test_vanilla_version_list_includes_snapshots(self):
+  import engines
+  manifest={'versions':[{'id':'release','type':'release'},{'id':'snapshot','type':'snapshot'}]}
+  with patch.object(engines.net,'get_json',return_value=manifest):
+   self.assertEqual(engines.available_versions('Vanilla'),['release','snapshot'])
+   self.assertEqual(engines.available_versions('Spigot'),['release'])
+ def test_backup_restore_preserves_backup_and_replaces_server(self):
+  from app import manual_backup
+  from backups import list_backups,restore_backup
+  bridge,folder=self.prepared();(folder/'world').mkdir();(folder/'world'/'level.dat').write_bytes(b'original')
+  saved=manual_backup(folder);(folder/'world'/'level.dat').write_bytes(b'changed');(folder/'new.txt').write_text('new')
+  self.assertEqual(list_backups(folder)[0]['path'],str(saved))
+  restore_backup(folder,saved)
+  self.assertEqual((folder/'world'/'level.dat').read_bytes(),b'original');self.assertTrue(saved.exists());self.assertFalse((folder/'new.txt').exists())
+  with self.assertRaises(ValueError):restore_backup(folder,folder)
+ def test_failed_restore_keeps_current_world(self):
+  from app import manual_backup
+  from backups import restore_backup
+  bridge,folder=self.prepared();saved=manual_backup(folder);(folder/'keep.txt').write_text('keep')
+  with patch('backups.copy_file',side_effect=OSError('disk full')):
+   with self.assertRaises(OSError):restore_backup(folder,saved)
+  self.assertEqual((folder/'keep.txt').read_text(),'keep')
+ def test_installer_logs_are_batched(self):
+  bridge=self.manager.active;calls=[];bridge.changed.connect(lambda:calls.append(1))
+  for i in range(1000):bridge.log('Downloading mod '+str(i))
+  self.assertEqual(calls,[]);bridge.flush_logs();self.assertEqual(len(calls),1);self.assertIn('mod 999',bridge.s['logs'])
+ def test_qml_reload_does_not_mark_editor_dirty(self):
+  bridge,folder=self.prepared();engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('nova',self.manager)
+  engine.load(QUrl.fromLocalFile(str(ROOT/'app'/'qml'/'Main.qml')))
+  self.assertTrue(engine.rootObjects());window=engine.rootObjects()[0];window.setProperty('page',3);QTest.qWait(20)
+  (folder/'server.properties').write_text('motd=External update\n');bridge.refresh_files();QTest.qWait(20)
+  self.assertFalse(bridge.s['dirty']);self.assertIn('External update',bridge.s['editor'])
+  shiboken6.delete(engine)
  def test_release_has_no_personal_endpoint_or_runtime_data(self):
   # Runtime data belongs outside source distributions.
   for path in (ROOT/'app').rglob('*'):

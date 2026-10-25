@@ -156,33 +156,15 @@ class ServerFiles:
                 raise ValueError('Symbolic links and junctions cannot be edited.')
         return path
     def config_files(self):
+        # Only core server files; never traverse mod/plugin/world config trees.
+        names=set(ROOT_FILES)
+        names.update({'config/paper-global.yml','config/paper-world-defaults.yml'})
         paths=[]
-        for path in self.root.iterdir():
-            if path.name in ROOT_FILES and path.is_file():paths.append(path.name)
-        roots=[self.root/'config',self.root/'defaultconfigs',self.root/'plugins']
-        roots.extend(p/'serverconfig' for p in self.root.iterdir() if p.is_dir() and not p.is_symlink())
-        worlds=self.root/'worlds'
-        if self.state.get('engine')=='Bedrock' and worlds.is_dir():
-            for world in worlds.iterdir():
-                if world.is_dir() and not world.is_symlink():
-                    for name in ('world_behavior_packs.json','world_resource_packs.json'):
-                        path=world/name
-                        if path.is_file():paths.append(path.relative_to(self.root).as_posix())
-        for base in roots:
-            try:base=self.path(base.relative_to(self.root))
+        for name in names:
+            try:path=self.path(name)
             except ValueError:continue
-            if not base.is_dir():continue
-            # os.walk does not follow directory symlinks; filter Windows junctions too.
-            for directory,dirs,files in os.walk(base,followlinks=False):
-                dirs[:]=[d for d in dirs if not (Path(directory)/d).is_symlink() and not (getattr((Path(directory)/d).stat(follow_symlinks=False),'st_file_attributes',0)&1024)]
-                for name in files:
-                    path=Path(directory)/name
-                    if path.suffix.lower() in EXTENSIONS:
-                        relative=path.relative_to(self.root).as_posix()
-                        try:self.path(relative)
-                        except ValueError:continue
-                        paths.append(relative)
-        return sorted(set(paths))
+            if path.is_file():paths.append(name)
+        return sorted(paths)
     def read_config(self,relative):
         path=self.path(relative)
         if relative not in self.config_files():raise ValueError('Choose a listed server configuration file.')

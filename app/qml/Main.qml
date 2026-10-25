@@ -19,7 +19,7 @@ ApplicationWindow {
     function fullscreen() { full=!full; if(full) showFullScreen(); else showNormal() }
     Shortcut { sequence: 'F11'; onActivated: win.fullscreen() }
     Shortcut { sequence: 'Escape'; onActivated: { if(win.full) win.fullscreen() } }
-    Shortcut { sequence: 'Ctrl+S'; onActivated: nova.action(win.page===3 && s.file ? 'write' : 'save') }
+    Shortcut { sequence: 'Ctrl+S'; onActivated: nova.action('save_all') }
     component Caption: Text { color: win.muted; font.pixelSize: 12; font.letterSpacing: 1.3 }
     component Heading: Text { color: '#f0f1f7'; font.pixelSize: 29; font.weight: Font.DemiBold }
     component Body: Text { color: '#a4adbe'; font.pixelSize: 13; wrapMode: Text.WordWrap }
@@ -159,7 +159,7 @@ ApplicationWindow {
                                 }
                                 RowLayout {
                                     Combo { choices: ['Vanilla','Paper','Spigot','Forge','CurseForge','Bedrock']; currentIndex: choices.indexOf(s.engine); onActivated: { nova.update('engine',currentText); nova.action('versions') } }
-                                    Combo { id: version; editable: true; choices: s.versions; displayText: s.version; editText: s.version; onActivated: nova.update('version',currentText); onAccepted: nova.update('version',editText); onEditTextChanged: { if(activeFocus) nova.draft('version',editText) } }
+                                    Combo { id: version; objectName: 'versionSelector'; popup.onOpened: nova.action('ensure_versions'); editable: true; choices: s.versions; displayText: s.version; editText: s.version; onActivated: nova.update('version',currentText); onAccepted: nova.update('version',editText); onEditTextChanged: { if(activeFocus) nova.draft('version',editText) } }
                                     BusyAction { text: 'Refresh versions'; onClicked: nova.action('versions') }
                                     Caption { text: 'RAM GB' }
                                     SpinBox { palette.base: '#151a23'; from: 2; to: 16; value: s.ram; onValueModified: nova.update('ram',value); enabled: s.engine!=='Bedrock'; palette.text: '#eeeeef'; palette.buttonText: '#eeeeef'; palette.button: '#303642' }
@@ -260,11 +260,11 @@ ApplicationWindow {
                 // FILES
                 Item { ColumnLayout {
                     anchors.fill: parent; anchors.margins: 26; spacing: 14
-                    RowLayout { Heading { text: 'Shape your world.'; Layout.fillWidth: true } BusyAction { text: 'Reload files'; onClicked: nova.action('files') } }
-                    Body { text: 'Files load automatically after installation, profile changes and external updates. Stop this server before saving files.'; Layout.fillWidth: true }
+                    RowLayout { Heading { text: 'Shape your world.'; Layout.fillWidth: true } BusyAction { text: 'Save All'; primary: true; enabled: s.filesLoaded && s.server==='Stopped' && !s.busy; onClicked: nova.action('save_all') } BusyAction { text: 'Reload files'; onClicked: nova.action('files') } }
+                    Body { text: 'Core server files load automatically. New installations are saved and ready; Save All or Ctrl+S saves your file and server settings edits.'; Layout.fillWidth: true }
                     Body { visible: !s.filesLoaded; text: 'Install a server or choose its folder on Server to load editable settings.'; Layout.fillWidth: true }
-                    TabBar { id: fileTabs; objectName: 'fileTabs'; Layout.fillWidth: true; background: Rectangle { color: 'transparent' }
-                        NTab { text: 'Configuration editor' } NTab { text: 'Server settings' } NTab { text: 'Mods & plugins' } NTab { text: 'Import ZIP' }
+                    TabBar { id: fileTabs; onCurrentIndexChanged: { if(currentIndex===4) nova.action('backups') } objectName: 'fileTabs'; Layout.fillWidth: true; background: Rectangle { color: 'transparent' }
+                        NTab { text: 'Configuration editor' } NTab { text: 'Server settings' } NTab { text: 'Mods & plugins' } NTab { text: 'Import ZIP' } NTab { text: 'Backups' }
                     }
                     StackLayout { currentIndex: fileTabs.currentIndex; Layout.fillWidth: true; Layout.fillHeight: true
                         ColumnLayout {
@@ -275,7 +275,11 @@ ApplicationWindow {
                             }
                             Body { text: (s.file || 'Select a file')+(s.dirty ? '  • Unsaved changes' : '') }
                             ScrollView { Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                                TextArea { id: editor; text: s.editor; color: '#d5dfef'; font.family: 'Consolas'; font.pixelSize: 13; selectByMouse: true; wrapMode: TextEdit.NoWrap; background: Rectangle { color: '#10141c'; radius: 12 } onTextChanged: { if(text!==s.editor) nova.update('editor',text) } }
+                                TextArea { id: editor; property bool syncing: false
+                                    function syncText() { if (text!==s.editor) { syncing=true; text=s.editor; syncing=false } }
+                                    Component.onCompleted: syncText()
+                                    Connections { target: nova; function onChanged() { editor.syncText() } }
+                                     color: '#d5dfef'; font.family: 'Consolas'; font.pixelSize: 13; selectByMouse: true; wrapMode: TextEdit.NoWrap; background: Rectangle { color: '#10141c'; radius: 12 } onTextChanged: { if(!syncing && text!==s.editor) nova.update('editor',text) } }
                             }
                         }
                         ScrollView { id: propScroll; contentWidth: availableWidth; clip: true
@@ -313,6 +317,23 @@ ApplicationWindow {
                             BusyAction { text: 'Select ZIP'; onClicked: nova.browse('archive') }
                             BusyAction { text: 'Replace from ZIP'; primary: true; onClicked: nova.action('zip') }
                             Item { Layout.fillHeight: true }
+                        }
+                        ColumnLayout {
+                            RowLayout {
+                                BusyAction { text: 'Back up now'; primary: true; onClicked: nova.action('backup') }
+                                BusyAction { text: 'Refresh backups'; onClicked: nova.action('backups') }
+                            }
+                            Body { text: 'Manual backups for this server. Stop hosting before backing up or restoring. Restore replaces current files after confirmation.'; Layout.fillWidth: true }
+                            Body { visible: !(s.backups || []).length; text: 'No backups yet. Choose Back up now to save one.' }
+                            ListView { Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 12; model: s.backups || []
+                                delegate: RowLayout { required property var modelData; width: ListView.view.width
+                                    ColumnLayout { Layout.fillWidth: true
+                                        Body { text: modelData.name; Layout.fillWidth: true }
+                                        Caption { text: new Date(modelData.modified*1000).toLocaleString() }
+                                    }
+                                    BusyAction { text: 'Restore'; enabled: s.server==='Stopped' && !s.busy; onClicked: nova.restoreBackup(modelData.path) }
+                                }
+                            }
                         }
                     }
                 }
