@@ -110,7 +110,7 @@ ApplicationWindow {
                 Caption { text: win.page===0 ? 'YOUR WORLD. YOUR RULES.' : (win.page===2 ? 'SERVER / MODPACKS' : win.titles[win.page].toUpperCase()); Layout.fillWidth: true }
                 Rectangle { width: 7; height: 7; radius: 4; color: s.server==='Ready' ? '#9ee2bd' : s.server==='Starting' ? '#e8cc95' : '#666e7e' }
                 Text { text: s.server; color: '#b9c1cf'; font.pixelSize: 12 }
-                Text { text: '•  '+s.tunnel; color: win.muted; font.pixelSize: 12 }
+                Text { text: '•  '+(s.use_vps===false ? 'Direct · no VPS' : s.tunnel); color: win.muted; font.pixelSize: 12 }
                 Action { text: win.full ? 'Windowed' : 'Full screen'; implicitHeight: 34; onClicked: win.fullscreen() }
             }
             RowLayout {
@@ -164,12 +164,12 @@ ApplicationWindow {
                                     RowLayout { spacing: 24
                                         Column { spacing: 5; Text { text: (s.players || []).length; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'PLAYERS'; font.pixelSize: 9 } }
                                         Column { spacing: 5; Text { text: s.uptime; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'UPTIME'; font.pixelSize: 9 } }
-                                        Column { spacing: 5; Text { text: s.tunnel; color: '#eef2f8'; font.pixelSize: 18 } Caption { text: 'PUBLIC TUNNEL'; font.pixelSize: 9 } }
+                                        Column { spacing: 5; Text { text: s.use_vps===false ? 'Direct hosting' : s.tunnel; color: '#eef2f8'; font.pixelSize: 18 } Caption { text: s.use_vps===false ? 'CONNECTION MODE' : 'PUBLIC TUNNEL'; font.pixelSize: 9 } }
                                     }
                                     Item { Layout.fillHeight: true }
                                     RowLayout { spacing: 10
                                         BusyAction { text: s.server==='Stopped' ? '▷  Start hosting' : '□  Stop hosting'; primary: true; implicitWidth: 164; onClicked: nova.action(s.server==='Stopped' ? 'hosting' : 'stop') }
-                                        BusyAction { text: 'Start local'; visible: s.server==='Stopped'; onClicked: nova.action('start') }
+                                        BusyAction { text: 'Start local'; visible: s.server==='Stopped' && s.use_vps!==false; onClicked: nova.action('start') }
                                         Action { text: 'Copy address'; onClicked: nova.action('copy') }
                                         Action { text: 'Server setup  ↗'; onClicked: win.page=1 }
                                     }
@@ -241,7 +241,7 @@ ApplicationWindow {
                         width: serverScroll.availableWidth-52; x: 26; spacing: 18
                         Heading { text: (s.profileName || 'Your server')+', at a glance.'; Layout.fillWidth: true; elide: Text.ElideRight }
                         RowLayout { Layout.fillWidth: true; spacing: 12
-                            Repeater { model: [{label:'SERVER',value:s.server},{label:'TUNNEL',value:s.tunnel},{label:'UPTIME',value:s.uptime},{label:'CPU',value:win.cpuText(s.cpuLoad)},{label:'RAM',value:win.ramText(s.ramBytes)}]
+                            Repeater { model: [{label:'SERVER',value:s.server},{label:s.use_vps===false ? 'CONNECTION' : 'TUNNEL',value:s.use_vps===false ? 'Direct · no VPS' : s.tunnel},{label:'UPTIME',value:s.uptime},{label:'CPU',value:win.cpuText(s.cpuLoad)},{label:'RAM',value:win.ramText(s.ramBytes)}]
                                 Panel { required property var modelData; Layout.fillWidth: true; implicitHeight: 100
                                     Column { anchors.fill: parent; anchors.margins: 20; spacing: 10
                                         Caption { text: modelData.label }
@@ -252,8 +252,8 @@ ApplicationWindow {
                         }
                         RowLayout { spacing: 10
                             BusyAction { text: 'Start hosting'; primary: true; onClicked: nova.action('hosting') }
-                            BusyAction { text: 'Start local'; onClicked: nova.action('start') }
-                            BusyAction { text: 'Connect tunnel'; onClicked: nova.action('tunnel') }
+                            BusyAction { text: 'Start local'; visible: s.use_vps!==false; onClicked: nova.action('start') }
+                            BusyAction { text: 'Connect tunnel'; visible: s.use_vps!==false; onClicked: nova.action('tunnel') }
                             Action { text: 'Stop hosting'; danger: true; onClicked: nova.action('stop') }
                             Action { text: 'Copy address'; onClicked: nova.action('copy') }
                             Action { text: 'Players'; onClicked: win.page=5 }
@@ -283,7 +283,9 @@ ApplicationWindow {
                                     BusyAction { text: 'Install / switch'; primary: true; onClicked: nova.action('install') }
                                     BusyAction { text: 'Manual backup'; onClicked: nova.action('backup') }
                                 }
-                                RowLayout {
+                                CheckBox { objectName: 'serverUseVpsToggle'; text: 'Use VPS tunnel'; checked: s.use_vps!==false; enabled: s.server==='Stopped' && s.tunnel==='Disconnected' && !s.busy; palette.windowText: '#c0c8d8'; onToggled: nova.update('use_vps',checked) }
+                                Body { visible: s.use_vps===false; text: 'Direct hosting: no VPS or SSH needed. Forward your router’s public game port to this PC’s LAN IP and local game port. Java listens on your network interfaces; players use your public IP or domain. See Settings → Hosting connection for setup.'; Layout.fillWidth: true }
+                                RowLayout { visible: s.use_vps!==false
                                     Caption { text: 'TUNNEL EDITION' }
                                     Combo { choices: ['Auto','Java','Bedrock']; currentIndex: choices.indexOf(s.tunnel_type || 'Auto'); onActivated: nova.update('tunnel_type',currentText) }
                                     Body { text: 'Java = TCP · Bedrock = UDP. Select the matching server edition.'; Layout.fillWidth: true }
@@ -452,7 +454,16 @@ ApplicationWindow {
                                 Body { text: 'Choose this once. + Add automatically creates a named subfolder for each new server. Duplicate names get a number. Install / switch fills that folder with the server files. Existing worlds keep their current locations.'; Layout.fillWidth: true }
                             }
                         }
-                        SettingsSection { objectName: 'connectionSettings'; title: 'VPS connection'
+                        SettingsSection { objectName: 'hostingSettings'; title: 'Hosting connection'
+                            ColumnLayout { Layout.fillWidth: true; spacing: 12
+                                CheckBox { objectName: 'settingsUseVpsToggle'; text: 'Use VPS tunnel'; checked: s.use_vps!==false; enabled: s.server==='Stopped' && s.tunnel==='Disconnected' && !s.busy; palette.windowText: '#c0c8d8'; onToggled: nova.update('use_vps',checked) }
+                                Body { text: s.use_vps===false ? 'Off: direct LAN / router port forwarding. No VPS, SSH credentials or tunnel is needed. Your router’s public IP is visible to players. Java binds to network interfaces when the server starts.' : 'On: Saturn forwards players through your VPS. Your saved SSH and VPS settings are used.'; Layout.fillWidth: true }
+                                Body { visible: s.use_vps===false; text: '1. Find this PC’s LAN IPv4 with ipconfig and reserve it in your router.\n2. Forward the external port to that LAN IP and the profile’s local game port: Java TCP, Bedrock UDP.\n3. Allow the selected game port/program in Windows Firewall.\n4. Enter your public IP or domain in Domain & display. Start hosting, then test from outside your home network.\nRouter rules and firewall changes are manual. With CGNAT, double NAT or no router access, use a VPS tunnel or obtain a public IP from your ISP. Public joins from the same LAN may need router NAT loopback; test LAN joins using the PC’s LAN IP.'; Layout.fillWidth: true }
+                                Action { visible: s.use_vps===false; text: 'Copy LAN address command'; onClicked: nova.copyHelpCommand('ipconfig') }
+                                Body { visible: s.use_vps===false; text: 'Router forwarding: Java public TCP '+s.direct_java_port+' → PC LAN IP : '+s.local_java_port+'; Bedrock public UDP '+s.direct_bedrock_port+' → PC LAN IP : '+s.local_bedrock_port+'. Local ports are in Ports & ranges; public router ports are in Domain & display.'; Layout.fillWidth: true }
+                            }
+                        }
+                        SettingsSection { objectName: 'connectionSettings'; title: 'VPS connection'; visible: s.use_vps!==false
                             ColumnLayout { id: connectionColumn; Layout.fillWidth: true; spacing: 12
                                 Caption { text: 'VPS CONNECTION' }
                                 Repeater { model: [{key:'vps_host',label:'VPS host / IP'},{key:'ssh_username',label:'SSH username'},{key:'ssh_port',label:'SSH port'},{key:'join_address',label:'Public join address'},{key:'key',label:'Local private key path (optional)'}]
@@ -478,19 +489,19 @@ ApplicationWindow {
                         }
                         SettingsSection { objectName: 'portSettings'; title: 'Ports & ranges'
                             ColumnLayout { id: portColumn; Layout.fillWidth: true; spacing: 12
-                                Caption { text: 'VPS PORT RANGES' }
-                                Body { text: 'Allow extra public ports in advance. Use inclusive ranges or commas, e.g. 25565-25575, 25580. Leave blank to allow only assigned profile ports. Up to 256 additional ports per protocol.'; Layout.fillWidth: true }
+                                Caption { visible: s.use_vps!==false; text: 'VPS PORT RANGES' }
+                                Body { visible: s.use_vps!==false; text: 'Allow extra public ports in advance. Use inclusive ranges or commas, e.g. 25565-25575, 25580. Leave blank to allow only assigned profile ports. Up to 256 additional ports per protocol.'; Layout.fillWidth: true }
                                 Repeater { model: [{key:'java_port_ranges',label:'Java TCP range',example:'25565-25575'},{key:'bedrock_port_ranges',label:'Bedrock UDP range',example:'19132-19142'}]
-                                    RowLayout { required property var modelData; Layout.fillWidth: true
+                                    RowLayout { required property var modelData; visible: s.use_vps!==false; Layout.fillWidth: true
                                         Body { text: modelData.label; Layout.preferredWidth: 190 }
                                         Field { objectName: modelData.key+'Field'; text: s[modelData.key] || ''; placeholderText: modelData.example; Layout.fillWidth: true; enabled: !s.busy; onTextEdited: nova.draft(modelData.key,text); onEditingFinished: nova.update(modelData.key,text) }
                                     }
                                 }
-                                Body { text: 'Save preferences, then Configure VPS to apply SSH and active UFW permissions. Existing profile ports stay included. New profiles inherit these ranges and take a free public port. Each server still listens on one port. Provider firewalls must allow the same ranges.'; Layout.fillWidth: true }
+                                Body { visible: s.use_vps!==false; text: 'Save preferences, then Configure VPS to apply SSH and active UFW permissions. Existing profile ports stay included. New profiles inherit these ranges and take a free public port. Each server still listens on one port. Provider firewalls must allow the same ranges.'; Layout.fillWidth: true }
                                 Caption { text: 'PROFILE GAME PORTS' }
                                 Body { text: 'Each simultaneous server needs its own folder and local ports. Profiles on the same VPS also need unique public ports. Run Configure VPS after adding profiles or changing public ports.'; Layout.fillWidth: true }
                                 Repeater { model: [{key:'local_java_port',label:'Java local TCP'},{key:'remote_java_port',label:'Java public TCP'},{key:'local_bedrock_port',label:'Bedrock local UDP'},{key:'bedrock_ipv6_port',label:'Bedrock local IPv6 UDP'},{key:'remote_bedrock_port',label:'Bedrock public UDP'}]
-                                    RowLayout { required property var modelData; Layout.fillWidth: true
+                                    RowLayout { required property var modelData; visible: s.use_vps!==false || !modelData.key.startsWith('remote_'); Layout.fillWidth: true
                                         Body { text: modelData.label; Layout.preferredWidth: 190 }
                                         Field { objectName: modelData.key+'Field'; text: String(s[modelData.key]); enabled: s.server==='Stopped' && !s.busy; Layout.fillWidth: true; onTextEdited: nova.draft(modelData.key,text); onEditingFinished: nova.update(modelData.key,text) }
                                     }
@@ -501,8 +512,14 @@ ApplicationWindow {
                             ColumnLayout { id: dnsColumn; Layout.fillWidth: true; spacing: 12
                                 Caption { text: 'DOMAIN & DISPLAY' }
                                 JoinAddressEditor { snapshot: win.s; Layout.fillWidth: true }
-                                Body { text: 'At your domain panel, create an A record for '+(s.join_address || 'your game domain')+' pointing to '+(s.vps_host || 'your VPS IPv4 address')+'. Use @ for the root domain. TTL of 1 hour is fine. If using Cloudflare, select DNS only. Changes here do not update DNS.'; Layout.fillWidth: true }
-                                Body { text: 'Java TCP: '+s.remote_java_port+'   •   Bedrock UDP: '+s.remote_bedrock_port+'\nVPS setup needs root or passwordless sudo. Allow every profile’s public port in provider firewalls.'; Layout.fillWidth: true }
+                                Body { text: 'At your domain panel, create an A record for '+((s.use_vps===false ? s.direct_join_address : s.join_address) || 'your game domain')+' pointing to '+(s.use_vps===false ? 'your router’s public IPv4 address' : (s.vps_host || 'your VPS IPv4 address'))+'. Use @ for the root domain. TTL of 1 hour is fine. If using Cloudflare, select DNS only. Changes here do not update DNS.'; Layout.fillWidth: true }
+                                Body { visible: s.use_vps!==false; text: 'Java TCP: '+s.remote_java_port+'   •   Bedrock UDP: '+s.remote_bedrock_port+'\nVPS setup needs root or passwordless sudo. Allow every profile’s public port in provider firewalls.'; Layout.fillWidth: true }
+                                Repeater { model: [{key:'direct_java_port',label:'Router public Java TCP'},{key:'direct_bedrock_port',label:'Router public Bedrock UDP'}]
+                                    RowLayout { required property var modelData; visible: s.use_vps===false; Layout.fillWidth: true
+                                        Body { text: modelData.label; Layout.preferredWidth: 190 }
+                                        Field { objectName: modelData.key+'Field'; text: String(s[modelData.key]); enabled: s.server==='Stopped' && !s.busy; Layout.fillWidth: true; onTextEdited: nova.draft(modelData.key,text); onEditingFinished: nova.update(modelData.key,text) }
+                                    }
+                                }
                                 SoundSwitch { text: 'Play startup scene'; checked: s.startup_animation!==false; palette.windowText: '#c0c8d8'; onToggled: nova.update('startup_animation',checked) }
                                 SoundSwitch { objectName: 'soundEnabledToggle'; text: 'Enable sounds'; checked: s.sound_enabled!==false; palette.windowText: '#c0c8d8'; onToggled: { nova.update('sound_enabled',checked); if(checked) uiAudio.play('click') } }
                                 Body { text: 'Mute all startup, hover, click and transition sounds with this switch.'; Layout.fillWidth: true }

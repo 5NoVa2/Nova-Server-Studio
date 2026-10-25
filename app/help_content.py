@@ -1,5 +1,33 @@
 """In-app troubleshooting from real setup issues. No account-specific defaults."""
 TOPICS=[
+ {'id': 'direct-hosting',
+ 'category': 'Connections',
+ 'title': 'Host without a VPS — LAN and router port forwarding',
+ 'body': 'Uncheck Use VPS tunnel on Server or Settings → Hosting connection while the server is stopped. Start hosting now '
+         'starts only Minecraft; no SSH key, VPS or tunnel is needed. Saved VPS settings remain available when you turn the '
+         'checkbox back on.\n'
+         '\n'
+         '1. On the hosting PC, run ipconfig in PowerShell and note its LAN IPv4 address (often 192.168.x.x). Reserve that '
+         'address in your router so it stays the same. Java uses server-ip= (all network interfaces) in direct mode; Saturn '
+         'manages this at startup.\n'
+         '2. In the router, forward the chosen PUBLIC game port to this PC’s LAN IPv4 and the profile’s LOCAL game port. '
+         'Use TCP for Java or UDP for Bedrock. Defaults are Java 25565 and Bedrock 19132, but always use this profile’s '
+         'displayed ports. Router public ports can differ from local ports. Give simultaneous servers unique ports and '
+         'separate router rules.\n'
+         '3. Allow the selected game program/port through Windows Firewall. Do not disable the firewall. Saturn does not '
+         'change the router or firewall automatically.\n'
+         '4. In Settings → Domain & display, enter your router’s public IP or a domain pointing to it, and the router’s '
+         'external game port. The VPS join address is saved separately. A DNS-only A record points to your home public IPv4 '
+         'for direct hosting.\n'
+         '5. Start hosting. Join 127.0.0.1:LOCAL-PORT on the hosting PC; another LAN device uses PC-LAN-IP:LOCAL-PORT. '
+         'Friends outside use PUBLIC-IP:PUBLIC-PORT or your domain and port. Bedrock uses separate address and port '
+         'fields.\n'
+         '\n'
+         'Test the public path from outside the home network; some routers cannot loop back to their own public IP. A TCP '
+         'port checker cannot validate Bedrock UDP. If local works but outside does not, check router forwarding, Windows '
+         'Firewall, the protocol and your public address. With double NAT, forward on both routers or resolve the extra NAT '
+         'layer. With CGNAT or no router access, obtain a public IP from your ISP or use the VPS tunnel. Direct joins '
+         'reveal your public IP to players. Keep online authentication enabled.'},
  {'id': 'ssh-startup',
  'category': 'VPS & SSH',
  'title': 'First-time VPS & SSH setup — commands, failed logins and listening ports',
@@ -124,8 +152,8 @@ TOPICS=[
  {'id':'first-connection','category':'Connections','title':'Start here: local works, but friends cannot join','body':
  '1. Start the selected server and wait for Ready or the server’s normal startup-complete message.\n'
  '2. From the hosting PC, test 127.0.0.1 with this profile’s LOCAL game port. From another device on the same LAN, use the hosting PC’s LAN IP.\n'
- '3. Start the matching tunnel. Its log should show the PUBLIC VPS port forwarding to this PC’s LOCAL port.\n'
- '4. Test the VPS IP with the PUBLIC game port before testing your domain. If the IP works and the domain does not, check DNS.\n'
+ '3. With Use VPS tunnel on, start the matching tunnel. With it off, forward your router’s public game port to this PC’s LAN IP and local port.\n'
+ '4. Test the VPS IP (tunnel mode) or router’s public IP (direct mode) with the PUBLIC game port from outside your LAN before testing your domain. If the IP works and the domain does not, check DNS.\n'
  '5. Use the matching Java/Bedrock client, version and required mods. A successful SSH login alone does not prove Minecraft is reachable.'},
  {'id':'refused','category':'Connections','title':'Connection refused / getsockopt, even though VPS says connected','body':
  '“Connection refused” often means nothing is accepting connections at the address/port, or a firewall is actively rejecting it. A timeout can indicate filtering or a routing problem.\n'

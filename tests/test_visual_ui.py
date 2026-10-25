@@ -194,6 +194,20 @@ class VisualUITests(unittest.TestCase):
   page.findChild(QObject,'helpSearch').setProperty('text','ss -lnup');QTest.qWait(30)
   matches=page.property('matches');matches=matches.toVariant() if hasattr(matches,'toVariant') else matches
   self.assertEqual([row['id'] for row in matches],['ssh-startup'])
+ def test_optional_vps_checkbox_synchronizes_and_keeps_join_addresses_separate(self):
+  from PySide6.QtCore import QPointF,Qt
+  self.manager.setJoinAddress('vps.example.com')
+  intro=self.load();intro.finish();self.window.setHeight(1800);self.window.setProperty('page',4)
+  hosting=self.window.findChild(QObject,'hostingSettings');hosting.setProperty('expanded',True);QTest.qWait(60)
+  toggle=self.window.findChild(QObject,'settingsUseVpsToggle');point=toggle.mapToScene(QPointF(toggle.width()/2,toggle.height()/2)).toPoint()
+  QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point);QTest.qWait(40)
+  self.assertFalse(self.manager.s['use_vps']);self.assertFalse(self.window.findChild(QObject,'connectionSettings').property('visible'))
+  self.assertFalse(self.window.findChild(QObject,'serverUseVpsToggle').property('checked'))
+  hosting.setProperty('expanded',False);dns=self.window.findChild(QObject,'dnsSettings');dns.setProperty('expanded',True);QTest.qWait(40)
+  field=dns.findChild(QObject,'helpJoinAddressField');self.assertEqual(field.property('text'),'')
+  self.manager.setJoinAddress('home.example.com');QTest.qWait(30);self.assertEqual(field.property('text'),'home.example.com')
+  self.manager.update('use_vps',True);QTest.qWait(30);self.assertEqual(field.property('text'),'vps.example.com')
+  self.assertTrue(self.window.findChild(QObject,'settingsUseVpsToggle').property('checked'))
  def test_settings_domain_editor_save_validation_and_profile_isolation(self):
   from settings_store import SettingsStore
   self.manager.active.update('vps_host','203.0.113.20');self.manager.active.update('remote_java_port',25566)

@@ -1,7 +1,7 @@
 # Saturn Server Launcher
 
 Free, open-source Minecraft server management for Windows. **Created by Nova.**
-Current release: **1.0.1**.
+Current public release: **1.0.1**. This branch previews optional VPS / direct hosting for 1.0.2.
 
 Run Minecraft on your own Windows PC. Optionally connect it through your own
 VPS so friends can join without router port forwarding, using the VPS address
@@ -139,3 +139,7 @@ Free under MIT. See THIRD_PARTY_NOTICES.md for external libraries and game servi
 ## Help and join address
 
 Help provides searchable, expandable troubleshooting for VPS/SSH, tunnels, DNS, ports and common app issues. Edit the active profile’s join address in Settings → Domain & display, then Save join address. The same preference is shared with VPS connection settings. This updates the address Saturn shows/copies; it does not edit DNS at your provider. DNS guidance is provider-neutral.
+
+## Direct hosting without a VPS
+
+Uncheck **Use VPS tunnel** on Server or Settings → Hosting connection while stopped. Start hosting runs Minecraft without SSH. Java binds to network interfaces in direct mode; tunnel mode keeps Java on loopback. Use the PC LAN address for LAN joins. For internet joins, manually forward router TCP (Java) or UDP (Bedrock) to the profile’s local game port and allow the program/port in Windows Firewall. Set a separate direct public IP/domain and router public port in Domain & display. Existing VPS settings are preserved. No router or firewall rules are changed automatically. See Help → Host without a VPS for troubleshooting, CGNAT and double NAT.

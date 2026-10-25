@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from urllib.request import Request,urlopen
 from process_manager import check_cancelled
 
-VERSION='1.0.1'
+VERSION='1.0.2'
 PRIVATE_BUILD=False
 REPO='5NoVa2/Saturn-Server-Launcher'
 API=f'https://api.github.com/repos/{REPO}/releases?per_page=100'
