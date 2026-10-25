@@ -1,7 +1,8 @@
 """One owned, portable playit agent; credentials never enter game folders/logs."""
-import hashlib,os,re,subprocess,threading
+import hashlib,json,os,re,subprocess,threading
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import Request,HTTPRedirectHandler,build_opener
 from connection_settings import host,port
 from process_manager import managed_popen,start_worker
 
@@ -12,6 +13,42 @@ URL=f'https://github.com/playit-cloud/playit-agent/releases/download/v{VERSION}/
 SHA256='9b00d6ff7d37d1052e5ae097e1348e11deae8617cd7a8ba39d1777f2006316a3'
 CLAIM=re.compile(r'https://playit\.gg/claim/[a-fA-F0-9]{10}(?![a-zA-Z0-9/])')
 ANSI=re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+RUN_DATA_URL='https://api.playit.gg/v1/agents/rundata'
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self,*args,**kwargs):return None
+
+def assigned_tunnels(secret_path):
+    # The portable agent logs only the FIRST line of each screen in --stdout
+    # mode. Read its assigned tunnels through the same official read-only API.
+    # Never expose credentials, response bodies or request exceptions in logs.
+    with Path(secret_path).open(encoding='utf-8') as file:config=file.read(65537)
+    if len(config)>65536:raise ValueError('Invalid agent configuration')
+    match=re.search(r'^\s*secret_key\s*=\s*[\"\']([a-fA-F0-9]+)[\"\']\s*$',config,re.M)
+    secret=match.group(1) if match else config.strip()
+    if not re.fullmatch(r'(?:[a-fA-F0-9]{2})+',secret):raise ValueError('Agent authorization pending')
+    request=Request(RUN_DATA_URL,data=b'{}',headers={'Authorization':'Agent-Key '+secret,'Content-Type':'application/json'},method='POST')
+    with build_opener(NoRedirect()).open(request,timeout=10) as response:raw=response.read(1024*1024+1)
+    if len(raw)>1024*1024:raise ValueError('Invalid tunnel response')
+    result=json.loads(raw)
+    if result.get('status')!='success':raise ValueError('Tunnel lookup unavailable')
+    tunnels=result['data']['tunnels']
+    if not isinstance(tunnels,list):raise ValueError('Invalid tunnel response')
+    routes={};ambiguous=set()
+    for tunnel in tunnels:
+        try:
+            if tunnel.get('disabled_reason') is not None or tunnel.get('tunnel_type')=='https':continue
+            fields={field['name']:field['value'] for field in tunnel['agent_config']['fields']}
+            public=tunnel['display_address'];public_endpoint=endpoint(public)
+            local_port=port(fields.get('local_port') or (public_endpoint[1] if public_endpoint else ''))
+            local_ip=fields.get('local_ip','127.0.0.1')
+            if local_ip=='::1':local_ip='[::1]'
+            row=mapping(f'{public} => {local_ip}:{local_port}')
+            if row:
+                if row[0] in routes:ambiguous.add(row[0])
+                routes[row[0]]=row[1]
+        except (ValueError,TypeError,KeyError,AttributeError):continue
+    return {key:value for key,value in routes.items() if key not in ambiguous}
 
 def endpoint(value):
     value=value.strip()
@@ -74,7 +111,7 @@ class PlayitLease:
 class PlayitManager:
     def __init__(self,cache,notify):
         self.cache=Path(cache);self.notify=notify;self.process=None;self.leases={};self.mappings={}
-        self.claim='';self.connected=False;self.prepared=verified(paths(self.cache)[1]);self.status='Not started';self.lock=threading.RLock();self.generation=0
+        self.claim='';self.connected=False;self.prepared=verified(paths(self.cache)[1]);self.status='Not started';self.lock=threading.RLock();self.generation=0;self.lookup_stop=threading.Event()
     def poll(self):return self.process.poll() if self.process is not None else 0
     def snapshot(self):
         with self.lock:return dict(playitRunning=self.poll() is None,playitReady=self.prepared,playitStatus=self.status,playitClaimUrl=self.claim,playitMappings={str(k):{'host':v[0],'port':v[1]} for k,v in self.mappings.items()})
@@ -89,6 +126,7 @@ class PlayitManager:
             for key in ('PLAYIT_SECRET','PLAYIT_SECRET_PATH','API_BASE','PLAYIT_LOG'):env.pop(key,None)
             env['PLAYIT_LOG']='info'
             self.generation+=1;generation=self.generation;self.leases={};self.claim='';self.mappings={};self.connected=False
+            self.lookup_stop.set();self.lookup_stop=threading.Event();lookup_stop=self.lookup_stop
             self.process=managed_popen([str(exe),'--secret_path',str(secret),'--stdout','start'],cwd=secret.parent,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',bufsize=1,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             proc=self.process;self.status='Starting agent / waiting for authorization';self.notify()
         def read():
@@ -102,7 +140,21 @@ class PlayitManager:
                         self.connected=False;self.claim='';self.mappings={};self.status='Agent stopped. Check setup or re-claim if access was revoked.';self.notify()
             finally:
                 if proc.stdout:proc.stdout.close()
-        start_worker(read)
+        def refresh():
+            while not lookup_stop.is_set():
+                self.refresh_addresses(generation)
+                if lookup_stop.wait(3):return
+        start_worker(read);start_worker(refresh)
+    def refresh_addresses(self,generation):
+        with self.lock:
+            if generation!=self.generation or self.poll() is not None:return
+        try:routes=assigned_tunnels(paths(self.cache)[2])
+        except Exception:
+            # Exceptions may contain request/credential data: deliberately omit.
+            routes={}
+        with self.lock:
+            if generation!=self.generation or self.poll() is not None:return
+            self.mappings=routes;self.notify()
     def consume(self,raw):
         # Never forward raw output: it can contain guest-login tokens or secrets.
         line=ANSI.sub('',raw).strip();match=CLAIM.search(line)
@@ -129,7 +181,7 @@ class PlayitManager:
             if not self.leases:self.stop()
     def stop(self):
         with self.lock:
-            self.generation+=1;proc=self.process;self.process=None;self.leases={};self.connected=False;self.mappings={};self.claim='';self.status='Stopped'
+            self.lookup_stop.set();self.generation+=1;proc=self.process;self.process=None;self.leases={};self.connected=False;self.mappings={};self.claim='';self.status='Stopped'
             if proc is not None and proc.poll() is None:proc.terminate()
             self.notify()
     def address(self,local_port):

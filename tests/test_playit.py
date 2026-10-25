@@ -55,6 +55,36 @@ class PlayitBackendTests(unittest.TestCase):
   m=self.manager;m.process=Mock();m.process.poll.return_value=None
   self.assertNotEqual(m.tunnel_status(25565),'Connected');m.claim='https://playit.gg/claim/0123456789';self.assertIn('approval',m.tunnel_status(25565))
   m.claim='';m.connected=True;m.mappings={25565:('abc.ply.gg',32123)};self.assertEqual(m.tunnel_status(25565),'Connected')
+ def test_official_api_lookup_uses_agent_config_and_excludes_disabled_or_wrong_targets(self):
+  secret=pb.paths(self.temp.name)[2];secret.parent.mkdir(parents=True);secret.write_text('secret_key = "012345abcdef"\n')
+  def tunnel(address,local_port,ip='127.0.0.1',**extra):
+   return dict(display_address=address,agent_config={'fields':[{'name':'local_port','value':str(local_port)},{'name':'local_ip','value':ip}]},**extra)
+  tunnels=[tunnel('one.joinmc.link',25565),tunnel('two.ply.gg:32123',25566),tunnel('bedrock.ply.gg:19133',19132),tunnel('disabled.ply.gg:1234',25567,disabled_reason='disabled'),tunnel('wrong.ply.gg:1234',25568,ip='192.168.1.2')]
+  response=Mock();response.__enter__=Mock(return_value=response);response.__exit__=Mock(return_value=False);response.read.return_value=json.dumps({'status':'success','data':{'tunnels':tunnels}}).encode()
+  with patch.object(pb,'build_opener') as opener:
+   opener.return_value.open.return_value=response
+   routes=pb.assigned_tunnels(secret);request=opener.return_value.open.call_args.args[0]
+   self.assertEqual(request.full_url,pb.RUN_DATA_URL);self.assertEqual(request.get_method(),'POST');self.assertEqual(request.get_header('Authorization'),'Agent-Key 012345abcdef');self.assertEqual(request.data,b'{}')
+  self.assertEqual(routes,{25565:('one.joinmc.link',None),25566:('two.ply.gg',32123),19132:('bedrock.ply.gg',19133)})
+ def test_api_refresh_resolves_addresses_missing_from_real_stdout(self):
+  m=self.manager;m.process=Mock();m.process.poll.return_value=None
+  m.consume('INFO playit (v0.17.1): 123 tunnel running, 1 tunnels registered')
+  self.assertIsNone(m.address(25565))
+  with patch.object(pb,'assigned_tunnels',return_value={25565:('one.joinmc.link',None)}):m.refresh_addresses(m.generation)
+  self.assertEqual(m.address(25565),('one.joinmc.link',None));self.assertEqual(m.tunnel_status(25565),'Connected')
+ def test_refresh_failure_and_stopped_generation_never_leave_stale_addresses_or_secrets(self):
+  m=self.manager;m.process=Mock();m.process.poll.return_value=None;m.connected=True;m.mappings={25565:('old.ply.gg',1234)}
+  with patch.object(pb,'assigned_tunnels',side_effect=ValueError('PRIVATE_SECRET')):m.refresh_addresses(m.generation)
+  self.assertIsNone(m.address(25565));self.assertNotIn('PRIVATE_SECRET',json.dumps(m.snapshot()))
+  generation=m.generation
+  def stopped_lookup(*args):m.stop();return {25565:('old.ply.gg',1234)}
+  with patch.object(pb,'assigned_tunnels',side_effect=stopped_lookup):m.refresh_addresses(generation)
+  self.assertEqual(m.mappings,{});self.assertTrue(m.lookup_stop.is_set())
+ def test_api_rejects_invalid_config_without_network_request(self):
+  secret=Path(self.temp.name)/'playit.toml';secret.write_text('secret_key = "not-a-key"')
+  with patch.object(pb,'build_opener') as opener:
+   with self.assertRaises(ValueError):pb.assigned_tunnels(secret)
+   opener.assert_not_called()
 
 class PlayitHostingTests(unittest.TestCase):
  def setUp(self):
@@ -78,6 +108,13 @@ class PlayitHostingTests(unittest.TestCase):
    s.action('hosting');self.assertTrue(s.pending);s.connect_tunnel();acquire.assert_called_once_with('main',25565)
    self.manager.queue.dispatch(s,'start');self.assertTrue(self.manager.queue.restore_tunnel)
   s.server=None;s.tunnel=None
+ def test_copy_uses_api_route_for_selected_profile_java_and_bedrock(self):
+  s=self.s;m=self.manager.playit;s.s.update(use_playit=True,use_vps=False,local_java_port=25566)
+  m.process=Mock();m.process.poll.return_value=None;m.consume('INFO playit (v0.17.1): 123 tunnel running, 3 tunnels registered')
+  with patch.object(pb,'assigned_tunnels',return_value={25565:('other.joinmc.link',None),25566:('selected.joinmc.link',None),19132:('bedrock.ply.gg',19133)}):m.refresh_addresses(m.generation)
+  s.action('copy');self.assertEqual(app.clipboard().text(),'selected.joinmc.link')
+  s.s.update(engine='Bedrock',installedEngine='Bedrock');s.action('copy');self.assertEqual(app.clipboard().text(),'bedrock.ply.gg');self.assertEqual(s.join_port(),19133)
+  m.mappings={};app.clipboard().setText('keep clipboard');s.action('copy');self.assertEqual(app.clipboard().text(),'keep clipboard')
  def test_stop_all_and_updates_include_setup_only_agent(self):
   m=self.manager.playit;m.process=Mock();m.process.poll.return_value=None;proc=m.process
   with self.assertRaisesRegex(ValueError,'playit agent'):self.manager.updates_idle()
