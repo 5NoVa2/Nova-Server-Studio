@@ -379,6 +379,15 @@ ApplicationWindow {
                         }
                         Panel { Layout.fillWidth: true; implicitHeight: portColumn.implicitHeight+40
                             ColumnLayout { id: portColumn; anchors.fill: parent; anchors.margins: 20; spacing: 12
+                                Caption { text: 'VPS PORT RANGES' }
+                                Body { text: 'Allow extra public ports in advance. Use inclusive ranges or commas, e.g. 25565-25575, 25580. Leave blank to allow only assigned profile ports. Up to 256 additional ports per protocol.'; Layout.fillWidth: true }
+                                Repeater { model: [{key:'java_port_ranges',label:'Java TCP range',example:'25565-25575'},{key:'bedrock_port_ranges',label:'Bedrock UDP range',example:'19132-19142'}]
+                                    RowLayout { required property var modelData; Layout.fillWidth: true
+                                        Body { text: modelData.label; Layout.preferredWidth: 190 }
+                                        Field { objectName: modelData.key+'Field'; text: s[modelData.key] || ''; placeholderText: modelData.example; Layout.fillWidth: true; enabled: !s.busy; onTextEdited: nova.draft(modelData.key,text); onEditingFinished: nova.update(modelData.key,text) }
+                                    }
+                                }
+                                Body { text: 'Save preferences, then Configure VPS to apply SSH and active UFW permissions. Existing profile ports stay included. New profiles inherit these ranges and take a free public port. Each server still listens on one port. Provider firewalls must allow the same ranges.'; Layout.fillWidth: true }
                                 Caption { text: 'PROFILE GAME PORTS' }
                                 Body { text: 'Each simultaneous server needs its own folder and local ports. Profiles on the same VPS also need unique public ports. Run Configure VPS after adding profiles or changing public ports.'; Layout.fillWidth: true }
                                 Repeater { model: [{key:'local_java_port',label:'Java local TCP'},{key:'remote_java_port',label:'Java public TCP'},{key:'local_bedrock_port',label:'Bedrock local UDP'},{key:'bedrock_ipv6_port',label:'Bedrock local IPv6 UDP'},{key:'remote_bedrock_port',label:'Bedrock public UDP'}]

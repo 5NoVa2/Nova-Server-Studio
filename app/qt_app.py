@@ -11,6 +11,7 @@ from runtime import CACHE
 from settings_store import SettingsStore
 from connection_settings import Connection, setup_script, preferences
 from process_manager import managed_popen, start_worker
+from port_ranges import parse_ranges
 
 BASE=Path(__file__).resolve().parent
 class Bridge(QObject):
@@ -118,6 +119,8 @@ class Bridge(QObject):
     def save(self):
         try:
             data={k:self.s[k] for k in self.store.data};data.update(preferences(data))
+            from port_ranges import RANGE_KEYS,normalize
+            for key in RANGE_KEYS:data[key]=normalize(data[key])
             from connection_settings import port
             for key in ('local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port'):data[key]=port(data[key])
             self.store.save(data);return True
@@ -228,7 +231,7 @@ class Bridge(QObject):
                 if self.active(self.tunnel):raise ValueError('Stop the tunnel before configuring your VPS.')
                 c=Connection.parse(self.s);creds=self.credentials()
                 from host_ports import vps_script
-                ports=self.owner.vps_ports(c) if self.owner else ([self.s['remote_java_port']],[self.s['remote_bedrock_port']])
+                ports=self.owner.vps_ports(c) if self.owner else ([self.s['remote_java_port']]+parse_ranges(self.s['java_port_ranges']),[self.s['remote_bedrock_port']]+parse_ranges(self.s['bedrock_port_ranges']))
                 script=vps_script((BASE/'vps_setup.sh').read_text(),c.ssh_username,*ports)
                 def configure():
                     from ssh_backend import connect,configure

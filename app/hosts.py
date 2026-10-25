@@ -108,14 +108,18 @@ class HostManager(QObject):
             used_bedrock={int(s.s[k]) for s in self.sessions.values() for k in ('local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port')}
             java=next(p for p in range(25565,65536) if p not in used_java)
             bedrock=next(p for p in range(19132,65535,2) if p not in used_bedrock and p+1 not in used_bedrock)
+            from port_ranges import parse_ranges,assign_remote
+            peers=[s for s in self.sessions.values() if s.s['vps_host']==self.active.s['vps_host']]
+            remote_java=assign_remote(parse_ranges(self.active.s['java_port_ranges']),{int(s.s['remote_java_port']) for s in peers},java)
+            remote_bedrock=assign_remote(parse_ranges(self.active.s['bedrock_port_ranges']),{int(s.s['remote_bedrock_port']) for s in peers},bedrock)
             from server_locations import new_server_folder
             for existing in self.sessions.values():
                 path=Path(existing.s['folder']).expanduser().resolve()
                 if self.servers_root==path or path in self.servers_root.parents:raise ValueError('Choose a main servers folder outside existing server folders in Settings.')
             destination=new_server_folder(self.servers_root,name,[s.s['folder'] for s in self.sessions.values()])
             session=self.bridge_class(self.app,identifier,self)
-            for key in ('vps_host','ssh_username','ssh_port','join_address','key'):session.s[key]=self.active.s[key]
-            session.s.update(folder=str(destination),local_java_port=java,remote_java_port=java,local_bedrock_port=bedrock,remote_bedrock_port=bedrock,bedrock_ipv6_port=bedrock+1)
+            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges'):session.s[key]=self.active.s[key]
+            session.s.update(folder=str(destination),local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
             session.secrets['apiKey']=self.apiKey
             if not session.save():
                 session.timer.stop()
@@ -180,7 +184,11 @@ class HostManager(QObject):
             if folder==otherfolder or folder in otherfolder.parents or otherfolder in folder.parents:raise ValueError('Another active profile is using this folder. Stop it before changing files.')
     def vps_ports(self,connection):
         peers=[s for s in self.sessions.values() if s.s['vps_host'] and Connection.parse(s.s).vps_host==connection.vps_host and s.s['ssh_username']==connection.ssh_username]
-        return [s.s['remote_java_port'] for s in peers],[s.s['remote_bedrock_port'] for s in peers]
+        from port_ranges import parse_ranges
+        java={int(s.s['remote_java_port']) for s in peers};bedrock={int(s.s['remote_bedrock_port']) for s in peers}
+        for session in peers:
+            java.update(parse_ranges(session.s['java_port_ranges']));bedrock.update(parse_ranges(session.s['bedrock_port_ranges']))
+        return sorted(java),sorted(bedrock)
     @Slot(str)
     def restoreBackup(self,path):self.active.restoreBackup(path)
     @Slot(str)

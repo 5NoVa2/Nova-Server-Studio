@@ -2,7 +2,7 @@
 
 Free, open-source Minecraft server management for Windows. Created by **Nova**.
 
-**First public beta: 1.0.0-beta.2.** Local hosting, multiple independent server
+**First public beta: 1.0.0-beta.3.** Local hosting, multiple independent server
 profiles, and optional reverse SSH hosting through a VPS—all in one window.
 
 ## Features
@@ -133,3 +133,16 @@ Not an official Minecraft product. Not approved by or associated with Mojang
 or Microsoft. Minecraft is a trademark of its respective owners.
 
 See RELEASE_NOTES.md for the beta.2 save, performance, version-selector and backup restore changes.
+
+## VPS port ranges
+
+In Settings, enter a Java TCP range such as `25565-25575` and optionally a
+Bedrock UDP range such as `19132-19142`. Comma-separated ports/ranges also work.
+Save preferences, then run Configure VPS. This updates SSH forwarding permissions
+and an active UFW firewall. Open the same ranges in any provider firewall.
+
+Each server still uses one public game port. New profiles inherit the ranges and
+choose an unused public port. Existing assigned profile ports stay included.
+Blank ranges preserve the existing per-profile behavior. Range permissions are
+combined across profiles with the same VPS/SSH user; change inherited ranges in
+those profiles too if shrinking the permitted set. Old UFW allowances remain.

@@ -7,13 +7,17 @@ import uuid
 from pathlib import Path
 
 DEFAULT_FOLDER = str(Path.home()/'MinecraftServer')
-DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'tunnel_type':'Auto', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
+DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'tunnel_type':'Auto', 'java_port_ranges':'', 'bedrock_port_ranges':'', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
 
 
 def validated(data):
     result = dict(DEFAULTS)
     if not isinstance(data, dict):
         return result
+    from port_ranges import RANGE_KEYS,normalize
+    for key in RANGE_KEYS:
+        try:result[key]=normalize(data.get(key,''))
+        except ValueError:pass
     result['reduced']=bool(data.get('reduced',False))
     if data.get('tunnel_type') in ('Auto','Java','Bedrock'):result['tunnel_type']=data['tunnel_type']
     for key in ('local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port'):
