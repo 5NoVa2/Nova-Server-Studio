@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 CACHE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()/'.cache')))/'MCServerSwitcher'
 MANIFEST = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
-USER_AGENT = 'NovaServerStudio/1.0.0-beta.4'
+USER_AGENT = 'NovaServerStudio/1.0.0-beta.5'
 
 def get_json(url, headers=None):
     check_cancelled()

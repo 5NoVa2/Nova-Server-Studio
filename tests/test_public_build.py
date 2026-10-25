@@ -51,6 +51,7 @@ class PublicBuildTests(unittest.TestCase):
   engine=QQmlApplicationEngine();engine.rootContext().setContextProperty('nova',self.manager)
   engine.load(QUrl.fromLocalFile(str(ROOT/'app'/'qml'/'Main.qml')))
   self.assertTrue(engine.rootObjects());window=engine.rootObjects()[0];self.manager.window=window
+  window.findChild(__import__('PySide6.QtCore',fromlist=['QObject']).QObject,'startupScene').finish()
   for index in range(6):window.setProperty('page',index);QTest.qWait(30)
   self.assertFalse(window.grabWindow().isNull());self.assertEqual(QQuickWindow.sceneGraphBackend(),'software')
   shiboken6.delete(engine)

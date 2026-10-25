@@ -1,3 +1,19 @@
+# Nova Server Studio 1.0.0-beta.5
+
+- Silver orbital startup scene with Nova branding, particles and a dashboard fade.
+- Skip intro, saved startup preference and Reduced motion support. No replay from tray.
+- Dashboard selected-server hero, real status/player counts, clickable profile cards and quick navigation.
+- Glossy floating sidebar/panels, pill buttons and refined hover/page motion.
+- New CurseForge selections retain artwork for server cards.
+- Appearance preferences apply across profiles. Join address refresh corrected.
+
+Includes the verified updater and all beta.4 features. Exit Nova from the tray
+before manually installing, or use beta.4 Settings > Nova updates. Stop all hosting
+before installing. Profiles, worlds, backups and saved API keys are retained when
+installing over the same location. Windows 10/11 x64 with Python 3.10+ remains
+required; unsigned beta. 35 automated checks passed; native Windows visual testing
+is still needed.
+
 # Nova Server Studio 1.0.0-beta.4
 
 Created by Nova. Free and open source under MIT.

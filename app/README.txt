@@ -1,4 +1,4 @@
-NOVA / MINECRAFT SERVER STUDIO 1.0.0-beta.4 - Windows x64
+NOVA / MINECRAFT SERVER STUDIO 1.0.0-beta.5 - Windows x64
 Created by Nova
 
 INSTALL / UPGRADE

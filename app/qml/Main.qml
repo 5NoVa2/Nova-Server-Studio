@@ -10,15 +10,18 @@ ApplicationWindow {
     property var s: nova.state
     property int page: 0
     property int shownProfileIndex: 0
+    property var serverRows: []
+    property string serverSignature: ''
+    function syncServers() { const rows=s.profileItems || []; const signature=JSON.stringify(rows); if(signature!==serverSignature) { serverSignature=signature; serverRows=rows } }
     property bool full: false
-    property var titles: ['Home','Server','Modpacks','Files','Settings','Players']
+    property var titles: ['Dashboard','Server','Modpacks','Files','Settings','Players']
     property color muted: '#8e96a8'
     font.family: 'Segoe UI'
     onClosing: function(close) { close.accepted=false; nova.action('tray') }
-    Component.onCompleted: shownProfileIndex=s.profileIndex || 0
+    Component.onCompleted: { shownProfileIndex=s.profileIndex || 0; syncServers(); intro.begin() }
     function fullscreen() { full=!full; if(full) showFullScreen(); else showNormal() }
     Shortcut { sequence: 'F11'; onActivated: win.fullscreen() }
-    Shortcut { sequence: 'Escape'; onActivated: { if(win.full) win.fullscreen() } }
+    Shortcut { sequence: 'Escape'; onActivated: { if(intro.active) intro.finish(); else if(win.full) win.fullscreen() } }
     Shortcut { sequence: 'Ctrl+S'; onActivated: nova.action('save_all') }
     component Caption: Text { color: win.muted; font.pixelSize: 12; font.letterSpacing: 1.3 }
     component Heading: Text { color: '#f0f1f7'; font.pixelSize: 29; font.weight: Font.DemiBold }
@@ -28,6 +31,7 @@ ApplicationWindow {
     component Combo: NCombo { enabled: !s.busy && !s.exiting }
     component BusyAction: Action { enabled: !s.busy && !s.exiting }
     Rectangle { anchors.fill: parent; gradient: Gradient { GradientStop { position: 0; color: '#10141e' } GradientStop { position: 0.7; color: '#090b10' } } }
+    NovaMark { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 600; height: 450; opacity: 0.07 }
     Item {
         anchors.fill: parent; clip: true
         Repeater {
@@ -42,13 +46,16 @@ ApplicationWindow {
         }
     }
     RowLayout {
-        anchors.fill: parent; spacing: 0
+        id: appSurface; opacity: intro.active ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: s.reduced ? 0 : 400 } }
+        anchors.fill: parent; anchors.margins: 14; spacing: 10
         Rectangle {
-            Layout.preferredWidth: 188; Layout.fillHeight: true; color: '#10131a'; border.color: '#202631'
+            Layout.preferredWidth: 184; Layout.fillHeight: true; radius: 25; color: '#b8101319'; border.color: '#2c333d'
             ColumnLayout {
                 anchors.fill: parent; anchors.margins: 20; spacing: 10
+                NovaMark { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 132; Layout.preferredHeight: 96 }
                 Text { text: 'N O V A'; color: '#f3f4fa'; font.pixelSize: 25; font.weight: Font.Bold; Layout.topMargin: 12 }
-                Caption { text: 'SERVER STUDIO'; font.pixelSize: 9; Layout.bottomMargin: 38 }
+                Caption { text: 'SERVER STUDIO'; font.pixelSize: 9; Layout.bottomMargin: 20 }
                 Repeater {
                     model: win.titles
                     Action {
@@ -93,38 +100,81 @@ ApplicationWindow {
             }
             StackLayout {
                 id: pages; property real revealOffset: 0; transform: Translate { y: pages.revealOffset } currentIndex: win.page; Layout.fillWidth: true; Layout.fillHeight: true
-                // HOME
-                Item {
+                // DASHBOARD
+                ScrollView { id: homeScroll; clip: true; contentWidth: availableWidth
                     ColumnLayout {
-                        id: homeLayout; property bool compact: parent.height<620
-                        anchors.centerIn: parent; width: Math.min(parent.width-64,850); spacing: compact ? 12 : 20
-                        Caption { text: 'MINECRAFT, WITHOUT THE FRICTION'; Layout.alignment: Qt.AlignHCenter }
-                        Text { text: 'Welcome to your\nnext world.'; color: '#f5f6fc'; font.pixelSize: homeLayout.compact ? 40 : 56; font.weight: Font.Light; horizontalAlignment: Text.AlignHCenter; Layout.alignment: Qt.AlignHCenter }
-                        Body { text: 'Create, host and shape your server. All in one place.'; Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: homeLayout.compact ? 8 : 24 }
-                        RowLayout {
-                            spacing: 14; Layout.fillWidth: true
-                            Repeater {
-                                model: [{title:'Control center',sub:'Build your server',icon:'◇',page:1},{title:'Discover packs',sub:'Find your next adventure',icon:'▦',page:2},{title:'Your workspace',sub:'Files, mods & settings',icon:'≡',page:3}]
-                                Panel {
-                                    required property var modelData
-                                    Layout.fillWidth: true; Layout.preferredHeight: homeLayout.compact ? 138 : 184
-                                    scale: tile.hovered ? 1.025 : 1
-                                    border.color: tile.hovered ? '#68758f' : '#303744'
-                                    Behavior on scale { NumberAnimation { duration: s.reduced ? 0 : 160 } }
-                                    Column { anchors.centerIn: parent; spacing: 12
-                                        Text { text: modelData.icon; color: '#e3e8f6'; font.pixelSize: 46; anchors.horizontalCenter: parent.horizontalCenter }
-                                        Text { text: modelData.title; color: '#f0f2f8'; font.pixelSize: 16; anchors.horizontalCenter: parent.horizontalCenter }
-                                        Text { text: modelData.sub; color: win.muted; font.pixelSize: 11; anchors.horizontalCenter: parent.horizontalCenter }
+                        width: homeScroll.availableWidth-52; x: 26; spacing: 20
+                        RowLayout { Layout.fillWidth: true
+                            ColumnLayout { Layout.fillWidth: true; spacing: 8
+                                Caption { text: 'WELCOME TO NOVA'; font.pixelSize: 10 }
+                                Heading { text: 'Your next world starts here.'; font.pixelSize: 32 }
+                                Body { text: 'One studio. Every server. Yours to shape.' }
+                            }
+                            Caption { text: (s.hostingCount || 0)+' ONLINE'; font.pixelSize: 10 }
+                        }
+                        Panel { Layout.fillWidth: true; implicitHeight: 266; clip: true
+                            Image { anchors.fill: parent; source: (s.cf_pack || {}).artwork || ''; asynchronous: true; fillMode: Image.PreserveAspectCrop; opacity: 0.18 }
+                            NovaMark { anchors.right: parent.right; anchors.rightMargin: -24; anchors.verticalCenter: parent.verticalCenter; width: 360; height: 270; opacity: 0.4 }
+                            RowLayout { anchors.fill: parent; anchors.margins: 28; spacing: 20
+                                ColumnLayout { Layout.fillWidth: true; spacing: 12
+                                    RowLayout { spacing: 8
+                                        Rectangle { width: 7; height: 7; radius: 4; color: s.server==='Ready' ? '#acf1ce' : s.server==='Starting' ? '#f2cc91' : '#798594' }
+                                        Caption { text: s.server.toUpperCase()+'  /  '+(s.installedEngine || s.engine).toUpperCase(); font.pixelSize: 10 }
                                     }
-                                    HoverHandler { id: tile }
+                                    Text { text: s.profileName || 'My server'; color: '#f5f6fa'; font.pixelSize: 35; font.weight: Font.Light; Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Body { text: (s.cf_pack.name || 'Minecraft '+s.version)+'  ·  '+(s.joinDisplay || 'localhost'); Layout.fillWidth: true; elide: Text.ElideRight; maximumLineCount: 1 }
+                                    RowLayout { spacing: 24
+                                        Column { spacing: 5; Text { text: (s.players || []).length; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'PLAYERS'; font.pixelSize: 9 } }
+                                        Column { spacing: 5; Text { text: s.uptime; color: '#eef2f8'; font.pixelSize: 24 } Caption { text: 'UPTIME'; font.pixelSize: 9 } }
+                                        Column { spacing: 5; Text { text: s.tunnel; color: '#eef2f8'; font.pixelSize: 18 } Caption { text: 'PUBLIC TUNNEL'; font.pixelSize: 9 } }
+                                    }
+                                    Item { Layout.fillHeight: true }
+                                    RowLayout { spacing: 10
+                                        BusyAction { text: s.server==='Stopped' ? '▷  Start hosting' : '□  Stop hosting'; primary: true; implicitWidth: 164; onClicked: nova.action(s.server==='Stopped' ? 'hosting' : 'stop') }
+                                        Action { text: 'Open workspace  ↗'; onClicked: win.page=1 }
+                                    }
+                                }
+                            }
+                        }
+                        RowLayout { Layout.fillWidth: true
+                            Caption { text: 'YOUR SERVERS'; font.pixelSize: 10; Layout.fillWidth: true }
+                            Action { text: '+ New server'; implicitHeight: 34; onClicked: { profileName.forceActiveFocus(); profileName.selectAll() } }
+                        }
+                        ListView { id: serverCards; Layout.fillWidth: true; Layout.preferredHeight: 155; orientation: ListView.Horizontal; spacing: 14; clip: true; model: win.serverRows
+                            delegate: Panel { required property var modelData; required property int index
+                                width: 248; height: 145; y: cardHover.hovered ? 0 : 5
+                                border.color: index===s.profileIndex ? '#8d9aaf' : cardHover.hovered ? '#626f80' : '#303741'
+                                Behavior on y { NumberAnimation { duration: s.reduced ? 0 : 150; easing.type: Easing.OutCubic } }
+                                Image { anchors.right: parent.right; anchors.margins: 16; anchors.verticalCenter: parent.verticalCenter; width: 74; height: 74; source: modelData.artwork || ''; asynchronous: true; fillMode: Image.PreserveAspectCrop; opacity: 0.25 }
+                                Column { anchors.fill: parent; anchors.margins: 20; spacing: 12
+                                    Caption { text: modelData.engine.toUpperCase(); font.pixelSize: 9 }
+                                    Text { width: parent.width; text: modelData.name; color: '#edf1f7'; font.pixelSize: 18; elide: Text.ElideRight }
+                                    Row { spacing: 7
+                                        Rectangle { y: 4; width: 6; height: 6; radius: 3; color: modelData.running ? '#acf1ce' : '#697485' }
+                                        Text { text: (modelData.running ? 'Running' : 'Stopped')+'  ·  '+modelData.players+' players'; color: '#98a5b7'; font.pixelSize: 11 }
+                                    }
+                                }
+                                HoverHandler { id: cardHover }
+                                TapHandler { onTapped: { nova.selectProfile(index); if((s.profileIndex || 0)===index) win.page=1 } }
+                            }
+                        }
+                        RowLayout { Layout.fillWidth: true; spacing: 14
+                            Repeater { model: [{title:'Discover modpacks',sub:'Find your next adventure',icon:'▦',page:2},{title:'Files & backups',sub:'Make the world your own',icon:'≡',page:3},{title:'Your studio',sub:'Connections, ports & updates',icon:'⚙',page:4}]
+                                Panel { required property var modelData; Layout.fillWidth: true; implicitHeight: 105
+                                    border.color: quickHover.hovered ? '#78899f' : '#303741'
+                                    RowLayout { anchors.fill: parent; anchors.margins: 20; spacing: 15
+                                        Text { text: modelData.icon; color: '#c4cfdf'; font.pixelSize: 28 }
+                                        ColumnLayout { Layout.fillWidth: true; spacing: 6
+                                            Text { text: modelData.title; color: '#e6ecf6'; font.pixelSize: 14 }
+                                            Body { text: modelData.sub; font.pixelSize: 11; Layout.fillWidth: true }
+                                        }
+                                    }
+                                    HoverHandler { id: quickHover }
                                     TapHandler { onTapped: win.page=modelData.page }
                                 }
                             }
                         }
-                        RowLayout { Layout.alignment: Qt.AlignHCenter; Layout.topMargin: homeLayout.compact ? 0 : 16
-                            BusyAction { text: '▷  Start hosting'; primary: true; implicitWidth: 190; onClicked: { win.page=1; nova.action('hosting') } }
-                            Body { text: s.joinDisplay || s.join_address; Layout.leftMargin: 12 }
-                        }
+                        Item { implicitHeight: 12 }
                     }
                 }
                 // SERVER
@@ -417,6 +467,8 @@ ApplicationWindow {
                                 Caption { text: 'DOMAIN & DISPLAY' }
                                 Body { text: 'At IONOS, create an A record for '+(s.join_address || 'your game domain')+' pointing to '+(s.vps_host || 'your VPS IPv4 address')+'. Use @ for the root domain. TTL of 1 hour is fine. If using Cloudflare, select DNS only. Changes here do not update DNS.'; Layout.fillWidth: true }
                                 Body { text: 'Java TCP: '+s.remote_java_port+'   •   Bedrock UDP: '+s.remote_bedrock_port+'\nVPS setup needs root or passwordless sudo. Allow every profile’s public port in provider firewalls.'; Layout.fillWidth: true }
+                                Switch { text: 'Play startup scene'; checked: s.startup_animation!==false; palette.windowText: '#c0c8d8'; onToggled: nova.update('startup_animation',checked) }
+                                Action { text: 'Preview startup scene'; enabled: !s.reduced; onClicked: intro.begin() }
                                 Switch { text: 'Reduce motion'; checked: s.reduced; palette.windowText: '#c0c8d8'; onToggled: nova.update('reduced',checked) }
                                 Body { text: 'Closing the window keeps hosting in the tray. Right-click Nova’s tray icon and choose Exit Nova to save the world and stop its processes.'; Layout.fillWidth: true }
                             }
@@ -461,6 +513,7 @@ ApplicationWindow {
             }
         }
     }
+    StartupScene { id: intro; objectName: 'startupScene'; anchors.fill: parent; z: 90; reduced: !!s.reduced; playOnStart: s.startup_animation!==false }
     // Confirmation is embedded in this window, including first SSH host trust.
     Rectangle { anchors.fill: parent; color: '#b0000000'; visible: !!s.dialog; z: 100
         MouseArea { anchors.fill: parent }
@@ -485,6 +538,7 @@ ApplicationWindow {
     }
     Connections { target: nova
         function onChanged() {
+            win.syncServers()
             const selected=s.profileIndex || 0
             if(selected!==win.shownProfileIndex) {
                 win.shownProfileIndex=selected

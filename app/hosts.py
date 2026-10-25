@@ -49,7 +49,7 @@ class HostManager(QObject):
     def state(self):
         from updater import VERSION
         values=dict(self.active.s);values.update(appVersion=VERSION,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
-        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
+        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else self.sessions[entry['id']].s['tunnel'])),tunnel=self.sessions[entry['id']].s['tunnel']) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values['busy']=self.active.s['busy'] or self.exiting;values['exiting']=self.exiting
         if self.exiting:values['activity']='Saving all worlds and closing…'
         return values
@@ -120,7 +120,7 @@ class HostManager(QObject):
                 if self.servers_root==path or path in self.servers_root.parents:raise ValueError('Choose a main servers folder outside existing server folders in Settings.')
             destination=new_server_folder(self.servers_root,name,[s.s['folder'] for s in self.sessions.values()])
             session=self.bridge_class(self.app,identifier,self)
-            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges'):session.s[key]=self.active.s[key]
+            for key in ('vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','reduced'):session.s[key]=self.active.s[key]
             session.s.update(folder=str(destination),local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
             session.secrets['apiKey']=self.apiKey
             if not session.save():
@@ -252,6 +252,9 @@ class HostManager(QObject):
             self.update_status=str(error);self.changed.emit()
     @Slot(str,'QVariant')
     def update(self,key,value):
+        if key in ('startup_animation','reduced'):
+            for session in self.sessions.values():
+                if session is not self.active:session.update(key,value)
         if key=='apiKey':
             for session in self.sessions.values():session.secrets['apiKey']=str(value)
         self.active.update(key,value)

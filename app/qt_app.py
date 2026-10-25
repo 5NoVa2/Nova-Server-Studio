@@ -340,8 +340,7 @@ class Bridge(QObject):
         self.flush_logs()
         running=self.active(self.server);tunnel=self.active(self.tunnel)
         elapsed=int(time.monotonic()-self.started) if running else 0
-        self.publish(server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel='Connected' if tunnel else 'Disconnected',uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
-        self.s['joinDisplay']=self.join_display()
+        self.publish(joinDisplay=self.join_display(),server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel='Connected' if tunnel else 'Disconnected',uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
         if not running and self.s['players']:self.publish(players=[])
         if running and self.ready.is_set() and time.monotonic()-self.last_player_poll>15:
             self.last_player_poll=time.monotonic();self.command('list')
@@ -536,7 +535,7 @@ class Bridge(QObject):
     def pick(self):
         project=self.s['project'];release=self.s['releases'][self.s['releaseIndex']]
         if not release.get('serverPackFileId'):raise ValueError('Choose a release with Server: Yes.')
-        selection=dict(project_id=project['id'],file_id=release['id'],name=project['name'],release=release.get('displayName',release['fileName']))
+        selection=dict(artwork=(project.get('logo') or {}).get('thumbnailUrl',''),project_id=project['id'],file_id=release['id'],name=project['name'],release=release.get('displayName',release['fileName']))
         self.publish(cf_pack=selection,engine='CurseForge');self.save();self.log('Selected '+selection['name']+' / '+selection['release'])
     def setup_tray(self):
         pix=QPixmap(64,64);pix.fill(QColor('#17191f'));p=QPainter(pix);p.setPen(QColor('#eeeeef'));p.setFont(QFont('Segoe UI',35,QFont.Weight.Bold));p.drawText(pix.rect(),Qt.AlignmentFlag.AlignCenter,'N');p.end()

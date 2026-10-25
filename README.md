@@ -2,7 +2,7 @@
 
 Free, open-source Minecraft server management for Windows. Created by **Nova**.
 
-**First public beta: 1.0.0-beta.4.** Local hosting, multiple independent server
+**First public beta: 1.0.0-beta.5.** Local hosting, multiple independent server
 profiles, and optional reverse SSH hosting through a VPS—all in one window.
 
 ## Features
@@ -157,3 +157,15 @@ for Nova to exit, rechecks the installer hash, and opens standard setup. Install
 over the existing location to retain profiles, worlds, backups and remembered keys.
 No updates install automatically. This verifies release-file integrity; the
 installer remains unsigned. Internet access to GitHub and its asset CDN is needed.
+
+## Silver orbital interface
+
+The dashboard has a selected-server hero, server cards with live status/player
+counts and shortcuts. Click a card to open that profile's server workspace.
+New CurseForge selections remember their artwork; existing selections use Nova's
+orbital mark until selected again. Panels and controls use a black/silver finish
+and lightweight transitions compatible with the software renderer.
+
+The 2.55-second startup scene can be skipped or disabled in Settings. Reduced
+motion skips it, and restoring Nova from the tray does not replay it. Appearance
+preferences synchronize across existing profiles and are inherited by new ones.

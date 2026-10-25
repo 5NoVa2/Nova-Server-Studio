@@ -15,8 +15,8 @@ Button {
     Behavior on scale { NumberAnimation { duration: b.motion ? 120 : 0 } }
     contentItem: Text { id: label; text: b.text; font: b.font; color: b.primary ? '#101115' : b.danger ? '#ffadb6' : '#e5e6ed'; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
     background: Rectangle {
-        radius: 13; color: b.primary ? (b.hovered ? '#ffffff' : '#dce0ed') : b.hovered ? '#292d38' : '#191c24'
-        border.color: b.primary ? '#ffffff' : b.hovered ? '#626979' : '#303440'
+        radius: 22; color: b.primary ? (b.hovered ? '#ffffff' : '#e1e6ee') : b.hovered ? '#292d38' : '#191c24'
+        border.color: b.primary ? '#ffffff' : b.hovered ? '#626979' : '#353d49'
         Behavior on color { ColorAnimation { duration: b.motion ? 140 : 0 } }
     }
     ToolTip.visible: hovered && ToolTip.text.length>0

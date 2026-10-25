@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 DEFAULT_FOLDER = str(Path.home()/'MinecraftServer')
-DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'tunnel_type':'Auto', 'java_port_ranges':'', 'bedrock_port_ranges':'', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
+DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'startup_animation':True, 'tunnel_type':'Auto', 'java_port_ranges':'', 'bedrock_port_ranges':'', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
 
 
 def validated(data):
@@ -18,6 +18,7 @@ def validated(data):
     for key in RANGE_KEYS:
         try:result[key]=normalize(data.get(key,''))
         except ValueError:pass
+    result['startup_animation']=bool(data.get('startup_animation',True))
     result['reduced']=bool(data.get('reduced',False))
     if data.get('tunnel_type') in ('Auto','Java','Bedrock'):result['tunnel_type']=data['tunnel_type']
     for key in ('local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port'):
@@ -35,6 +36,9 @@ def validated(data):
         result['cf_pack']={k:pack[k] for k in ('project_id','file_id')}
         for k in ('name','release'):
             result['cf_pack'][k]=pack.get(k,'') if isinstance(pack.get(k,''),str) else ''
+    artwork=pack.get('artwork','') if isinstance(pack,dict) else ''
+    if isinstance(artwork,str) and artwork.startswith('https://') and len(artwork)<2048 and result['cf_pack']:
+        result['cf_pack']['artwork']=artwork
     for key,validator in [('vps_host',host),('ssh_username',username),('ssh_port',port),('join_address',host)]:
         if key in data:
             try:result[key]=validator(data[key])
