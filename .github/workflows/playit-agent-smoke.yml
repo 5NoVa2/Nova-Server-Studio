@@ -1,0 +1,32 @@
+name: Playit portable agent smoke
+on:
+  push:
+    branches: [playit-support]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-agent:
+    runs-on: windows-2022
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify official portable agent and CLI arguments
+        shell: python
+        run: |
+          import sys, pathlib, hashlib, urllib.request, subprocess
+          sys.path.insert(0, 'app')
+          import playit_backend as p
+          exe=pathlib.Path('playit-native-smoke.exe').resolve()
+          urllib.request.urlretrieve(p.URL, exe)
+          assert hashlib.sha256(exe.read_bytes()).hexdigest()==p.SHA256
+          version=subprocess.run([str(exe),'version'],check=True,capture_output=True,text=True,timeout=15).stdout.strip()
+          assert version==p.VERSION, version
+          help=subprocess.run([str(exe),'--help'],check=True,capture_output=True,text=True,timeout=15).stdout
+          for flag in ['--secret_path','--stdout','start']:assert flag in help, flag
+          print('Verified official agent SHA-256:',p.SHA256)
+          print('Windows agent version:',version)
+          print('Portable start/secret-file/stdout arguments verified. No agent, account or tunnel was started.')

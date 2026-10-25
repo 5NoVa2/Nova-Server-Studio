@@ -1,9 +1,8 @@
-# Saturn Server Launcher 1.01.1
+# Saturn Server Launcher 1.01.2 — playit.gg preview
 
-## Support for LAN / standard public hosting
+- Optional playit.gg hosting alongside VPS SSH and direct LAN/public hosting.
+- Verified official portable agent, hidden managed process and shared multi-server lifecycle.
+- Browser approval and tunnel setup steps, matching local target and detected public join address.
+- Free-tier and Bedrock RakNet/NetherNet guidance.
 
-- Host on your LAN or through standard router port forwarding without a VPS.
-- New **Use VPS tunnel** checkbox on Server and Settings → Hosting connection. Turn it off for direct hosting, or on to use your saved VPS tunnel.
-- Separate direct join address and router public ports, with setup instructions.
-
-Router forwarding and Windows Firewall setup are manual. Exit Saturn from the tray before installing over your existing location. Profiles, worlds and saved settings are preserved.
+Preview only; not published as a release. Live account approval and end-to-end multiplayer still require testing.

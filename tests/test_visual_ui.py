@@ -208,6 +208,18 @@ class VisualUITests(unittest.TestCase):
   self.manager.setJoinAddress('home.example.com');QTest.qWait(30);self.assertEqual(field.property('text'),'home.example.com')
   self.manager.update('use_vps',True);QTest.qWait(30);self.assertEqual(field.property('text'),'vps.example.com')
   self.assertTrue(self.window.findChild(QObject,'settingsUseVpsToggle').property('checked'))
+ def test_playit_setup_ui_switches_provider_and_shows_matching_local_target(self):
+  from PySide6.QtCore import QPointF,Qt
+  intro=self.load();intro.finish();self.window.setHeight(1800);self.window.setProperty('page',4)
+  self.window.findChild(QObject,'hostingSettings').setProperty('expanded',True);QTest.qWait(60)
+  toggle=self.window.findChild(QObject,'settingsUsePlayitToggle');point=toggle.mapToScene(QPointF(toggle.width()/2,toggle.height()/2)).toPoint()
+  QTest.mouseClick(self.window,Qt.LeftButton,Qt.NoModifier,point);QTest.qWait(40)
+  self.assertTrue(self.manager.s['use_playit']);self.assertFalse(self.manager.s['use_vps']);self.assertFalse(self.window.findChild(QObject,'settingsUseVpsToggle').property('checked'))
+  self.assertIn('127.0.0.1:25565',self.window.findChild(QObject,'playitTarget').property('text'))
+  self.assertFalse(self.window.findChild(QObject,'startPlayitButton').property('enabled'));self.assertFalse(self.window.findChild(QObject,'claimPlayitButton').property('enabled'))
+  self.manager.playit.prepared=True;self.manager.playit.claim='https://playit.gg/claim/0123456789';self.manager.changed.emit();QTest.qWait(30)
+  self.assertTrue(self.window.findChild(QObject,'claimPlayitButton').property('enabled'))
+  self.manager.update('use_vps',True);QTest.qWait(30);self.assertFalse(self.window.findChild(QObject,'settingsUsePlayitToggle').property('checked'))
  def test_settings_domain_editor_save_validation_and_profile_isolation(self):
   from settings_store import SettingsStore
   self.manager.active.update('vps_host','203.0.113.20');self.manager.active.update('remote_java_port',25566)

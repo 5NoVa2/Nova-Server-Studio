@@ -100,9 +100,9 @@ class Bridge(QObject):
             if key=='apiKey':self.api_save_timer.start(800)
             return
         if key=='editor':self.publish(editor=str(value),dirty=str(value)!=getattr(self,'original_text',''));return
-        if key in ('folder','engine','java_version','use_vps','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
+        if key in ('folder','engine','java_version','use_vps','use_playit','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):
             self.error('Stop hosting and finish current work before changing server type, folder or ports.');return
-        if key=='use_vps' and not isinstance(value,bool):
+        if key in ('use_vps','use_playit') and not isinstance(value,bool):
             self.error('Use VPS tunnel must be on or off.');return
         if key=='java_version' and value not in ('Auto','8','11','17','21','25'):
             self.error('Choose a listed Java version.');return
@@ -116,13 +116,17 @@ class Bridge(QObject):
                         self.publish(dirty=False,propertyDirty=False);self.update('folder',value)
                     else:self.publish(folder=previous)
                 self.confirm('Discard unsaved changes?', 'Changing this server folder discards unsaved file and settings edits.',change);return
+        if key=='use_vps' and value:self.s['use_playit']=False
+        if key=='use_playit' and value:self.s['use_vps']=False
         if key in self.store.data or key in ('reduced','releaseIndex'):
             self.publish(**{key:value})
             if key in self.store.data:self.save()
             if key=='folder':self.refresh_files()
-            if key=='use_vps':self.publish(joinDisplay=self.join_display())
+            if key in ('use_vps','use_playit'):self.publish(joinDisplay=self.join_display())
     @Slot(str,result=bool)
     def setJoinAddress(self,value):
+        if self.s.get('use_playit'):
+            self.error('The playit join address comes from your active tunnel. Configure its local target in playit.gg.');return False
         if self.s['exiting']:return False
         try:
             from connection_settings import host
@@ -138,7 +142,7 @@ class Bridge(QObject):
     @Slot(str,str)
     def draft(self,key,value):
         if key in self.store.data and not self.s['exiting']:
-            if key in ('folder','engine','java_version','use_vps','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
+            if key in ('folder','engine','java_version','use_vps','use_playit','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
             if key=='folder':self.folder_editing=True
             self.s[key]=value
     def save(self):
@@ -208,7 +212,9 @@ class Bridge(QObject):
             if name=='save':self.save();return
             if name=='save_all':self.save_all();return
             if name=='copy':
-                if not self.s.get('use_vps',True) and not self.s.get('direct_join_address'):
+                if self.s.get('use_playit') and not self.playit_address():
+                    raise ValueError('Start the playit agent and configure a matching tunnel before copying its public address.')
+                if not self.s.get('use_playit') and not self.s.get('use_vps',True) and not self.s.get('direct_join_address'):
                     raise ValueError('Enter your public IP or domain in Settings → Domain & display before copying the public join address.')
                 address=self.join_host() if self.tunnel_kind()=='Bedrock' else self.join_display()
                 self.app.clipboard().setText(address)
@@ -259,6 +265,9 @@ class Bridge(QObject):
             if name in ('start','hosting'):
                 if self.s['busy'] or self.s['exiting']:return
                 self.start_server()
+                if self.s.get('use_playit'):
+                    if name=='hosting' and self.active(self.server):self.pending=True;self.deadline=time.monotonic()+300
+                    return
                 if not self.s.get('use_vps',True):
                     self.pending=False
                     self.log('Direct hosting started. Forward the public game port on your router to this PC’s LAN IP and local game port. No VPS tunnel is used.');return
@@ -360,6 +369,13 @@ class Bridge(QObject):
             self.server.stdin.write(text.lstrip('/')+'\n');self.server.stdin.flush()
         except Exception as e:self.error(e)
     def connect_tunnel(self):
+        if self.s.get('use_playit'):
+            if self.s['busy'] or self.active(self.tunnel):return
+            if not self.active(self.server):raise ValueError('Start the server first.')
+            if not self.owner:raise ValueError('playit needs the multi-server launcher.')
+            local=int(self.s['local_bedrock_port'] if self.tunnel_kind()=='Bedrock' else self.s['local_java_port'])
+            self.tunnel=self.owner.playit.acquire(self.profile_id,local)
+            self.log('playit agent started. Approve it and create the game tunnel in Settings → Hosting connection.');return
         if not self.s.get('use_vps',True):raise ValueError('Use VPS tunnel is off for this profile.')
         if self.s['busy'] or self.active(self.tunnel):return
         if not self.active(self.server):raise ValueError('Start the server first.')
@@ -389,7 +405,7 @@ class Bridge(QObject):
         running=self.active(self.server);tunnel=self.active(self.tunnel)
         self.publish(**self.stats.sample(self.server))
         elapsed=int(time.monotonic()-self.started) if running else 0
-        self.publish(joinDisplay=self.join_display(),server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel='Connected' if tunnel else 'Disconnected',uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
+        self.publish(joinDisplay=self.join_display(),server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel=(self.owner.playit.tunnel_status(int(self.s['local_bedrock_port'] if self.tunnel_kind()=='Bedrock' else self.s['local_java_port'])) if tunnel and self.s.get('use_playit') and self.owner else ('Connected' if tunnel else 'Disconnected')),uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
         if not running and self.s['players']:self.publish(players=[])
         if running and self.ready.is_set() and time.monotonic()-self.last_player_poll>15:
             self.last_player_poll=time.monotonic();self.command('list')
@@ -401,20 +417,31 @@ class Bridge(QObject):
             elif self.ready.is_set():self.pending=False;self.action('tunnel')
             elif time.monotonic()>self.deadline:self.pending=False;self.error('Readiness was not detected. Review the console before connecting the tunnel.')
     def tunnel_kind(self):
-        choice=self.s.get('tunnel_type','Auto') if self.s.get('use_vps',True) else 'Auto'
+        choice=self.s.get('tunnel_type','Auto') if self.s.get('use_vps',True) and not self.s.get('use_playit') else 'Auto'
         if choice!='Auto':return choice
         engine=self.running_engine if self.active(self.server) else self.s.get('installedEngine') or self.s['engine']
         return 'Bedrock' if engine=='Bedrock' else 'Java'
+    def playit_address(self):
+        if not self.owner:return None
+        local=int(self.s['local_bedrock_port'] if self.tunnel_kind()=='Bedrock' else self.s['local_java_port'])
+        return self.owner.playit.address(local) if self.owner.playit.connected else None
     def join_host(self):
+        if self.s.get('use_playit'):
+            address=self.playit_address();return address[0] if address else ''
         if not self.s.get('use_vps',True):return self.s.get('direct_join_address','')
         return self.s['join_address'] or self.s['vps_host'] or 'localhost'
     def join_port(self):
+        if self.s.get('use_playit'):
+            address=self.playit_address()
+            if not address:raise ValueError('Configure a matching playit game tunnel.')
+            if address[1] is None and self.tunnel_kind()=='Bedrock':raise ValueError('The Bedrock public port was not reported by playit.')
+            return address[1] or 25565
         kind='bedrock_port' if self.tunnel_kind()=='Bedrock' else 'java_port'
         prefix='direct_' if not self.s.get('use_vps',True) else ('remote_' if self.s['vps_host'] else 'local_')
         return int(self.s[prefix+kind])
     def join_display(self):
         bedrock=self.tunnel_kind()=='Bedrock';address=self.join_host()
-        if not address:return 'Set direct join address in Settings'
+        if not address:return 'Configure playit tunnel in Settings' if self.s.get('use_playit') else 'Set direct join address in Settings'
         try:port=self.join_port()
         except (ValueError,TypeError):return address+' (enter a valid game port)'
         if bedrock:return address+' : '+str(port)+' (Bedrock UDP)'
@@ -427,7 +454,7 @@ class Bridge(QObject):
         original=path.read_bytes();state=json.loads(original)
         keys=('local_java_port','local_bedrock_port','bedrock_ipv6_port')
         network={k:port(self.s[k]) for k in keys}
-        network['use_vps']=self.s.get('use_vps',True)
+        network['use_vps']=bool(self.s.get('use_vps',True) or self.s.get('use_playit'))
         if network['local_bedrock_port']==network['bedrock_ipv6_port']:raise ValueError('Bedrock IPv4 and IPv6 ports must be different.')
         if state.get('nova_ports')!=network:
             state['nova_ports']=network

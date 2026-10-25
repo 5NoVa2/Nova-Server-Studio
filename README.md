@@ -1,7 +1,7 @@
 # Saturn Server Launcher
 
 Free, open-source Minecraft server management for Windows. **Created by Nova.**
-Current release: **1.01.1**.
+Current public release: **1.01.1**. This branch previews playit.gg support for 1.01.2.
 
 Run Minecraft on your own Windows PC. Optionally connect it through your own
 VPS so friends can join without router port forwarding, using the VPS address
@@ -143,3 +143,11 @@ Help provides searchable, expandable troubleshooting for VPS/SSH, tunnels, DNS, 
 ## Direct hosting without a VPS
 
 Uncheck **Use VPS tunnel** on Server or Settings → Hosting connection while stopped. Start hosting runs Minecraft without SSH. Java binds to network interfaces in direct mode; tunnel mode keeps Java on loopback. Use the PC LAN address for LAN joins. For internet joins, manually forward router TCP (Java) or UDP (Bedrock) to the profile’s local game port and allow the program/port in Windows Firewall. Set a separate direct public IP/domain and router public port in Domain & display. Existing VPS settings are preserved. No router or firewall rules are changed automatically. See Help → Host without a VPS for troubleshooting, CGNAT and double NAT.
+
+## playit.gg preview
+
+Select **Use playit.gg tunnel** for a third hosting option. Prepare downloads the official supported portable 0.17.1 Windows x64 agent and verifies its pinned SHA-256 from the upstream release. No service is installed and no third-party binary is bundled. One owned agent is shared across profiles; account approval and game-tunnel creation happen in your browser. Set each local target to the exact 127.0.0.1 port shown by Saturn. Public addresses are read from matching agent routes. Java stays on loopback in playit mode.
+
+Minecraft Java currently has a free tunnel option. Free Bedrock requires RakNet where supported; NetherNet currently requires Premium. Third-party limits and availability apply. See https://playit.gg/ and https://playit.gg/support/minecraft-bedrock-nethernet/. No live user account or game connection is simulated in tests.
+
+Stop shared agent affects all playit profiles; stopping the last leased profile, Stop all, or Exit stops it. A setup-only agent remains until stopped. Native playit credentials live under MCServerSwitcher/playit/account in local application data and are excluded from worlds, app logs, sources and installer payloads. The UI never forwards raw agent output or private guest-login URLs.

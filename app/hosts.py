@@ -41,6 +41,8 @@ class HostManager(QObject):
             session.changed.connect(self.changed.emit)
             session.apiKeyChanged.connect(self.apiKeyChanged.emit)
         self.posted.connect(lambda fn:fn(),Qt.ConnectionType.QueuedConnection)
+        from playit_backend import PlayitManager
+        self.playit=PlayitManager(self.cache,lambda:self.posted.emit(self.changed.emit))
         from task_queue import HostTaskQueue
         self.queue=HostTaskQueue(self)
         if self.warning:self.active.log(self.warning)
@@ -51,8 +53,8 @@ class HostManager(QObject):
     @Property('QVariantMap',notify=changed)
     def state(self):
         from updater import VERSION,PRIVATE_BUILD
-        values=dict(self.active.s);values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
-        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else ('Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel']))),tunnel=('Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel'])) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
+        values=dict(self.active.s);values.update(self.playit.snapshot());values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
+        values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else ('playit.gg' if self.sessions[entry['id']].s.get('use_playit') else 'Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel']))),tunnel=('playit.gg' if self.sessions[entry['id']].s.get('use_playit') else 'Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel'])) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values.update(taskCreateError=self.task_create_error,schedules=[dict(row,label=__import__('task_queue').LABELS[row['operation']]) for row in self.queue.schedules.rows],scheduleTimezone='PC local time ('+time.strftime('%Z')+')',tasks=[dict(row) for row in self.queue.rows],queueRunning=self.queue.running or self.queue.current is not None,queuePaused=self.queue.paused)
         values['busy']=self.active.s['busy'] or self.exiting or bool(self.queue.current and self.queue.current['profile']==self.active.profile_id);values['exiting']=self.exiting
         if self.exiting:values['activity']='Saving all worlds and closing…'
@@ -128,7 +130,7 @@ class HostManager(QObject):
                 if self.servers_root==path or path in self.servers_root.parents:raise ValueError('Choose a main servers folder outside existing server folders in Settings.')
             destination=new_server_folder(self.servers_root,name,[s.s['folder'] for s in self.sessions.values()])
             session=self.bridge_class(self.app,identifier,self)
-            for key in ('use_vps','direct_join_address','vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):session.s[key]=self.active.s[key]
+            for key in ('use_playit','use_vps','direct_join_address','vps_host','ssh_username','ssh_port','join_address','key','java_port_ranges','bedrock_port_ranges','startup_animation','startup_sound','sound_enabled','sound_volume','reduced'):session.s[key]=self.active.s[key]
             session.s.update(folder=str(destination),direct_java_port=direct_java,direct_bedrock_port=direct_bedrock,local_java_port=java,remote_java_port=remote_java,local_bedrock_port=bedrock,remote_bedrock_port=remote_bedrock,bedrock_ipv6_port=bedrock+1)
             session.secrets['apiKey']=self.apiKey
             if not session.save():
@@ -256,6 +258,15 @@ class HostManager(QObject):
     def restoreBackup(self,path):self.active.restoreBackup(path)
     @Slot(str)
     def action(self,name):
+        if name=='playit_prepare':
+            from playit_backend import prepare
+            self.active.task('Preparing playit.gg…',lambda:prepare(self.cache,self.active.log),lambda result:self.playit_prepared());return
+        if name=='playit_start':
+            try:self.playit.start()
+            except Exception as error:self.active.error(error)
+            return
+        if name=='playit_stop':
+            self.playit.stop();return
         if name=='queue_run':self.queue.paused=False;self.queue.running=True;self.changed.emit();return
         if name=='queue_pause':self.queue.paused=True;self.queue.running=False;self.changed.emit();return
         if name=='queue_clear':
@@ -270,6 +281,8 @@ class HostManager(QObject):
                 self.queue.current.update(status='Cancelled',detail='Stopped by Stop all.');self.queue.current=None
             self.stopAll();self.changed.emit();return
         self.active.action(name)
+    def playit_prepared(self):
+        self.playit.prepared=True;self.changed.emit()
     def update_task(self,label,work,done):
         if self.update_busy or self.exiting:return
         self.update_busy=True;self.update_status=label;self.changed.emit()
@@ -288,6 +301,7 @@ class HostManager(QObject):
                 self.posted.emit(failed)
         start_worker(run)
     def updates_idle(self):
+        if self.playit.poll() is None:raise ValueError('Stop the playit agent before installing an update.')
         if self.exiting or self.update_busy:raise ValueError('Wait for the update operation to finish.')
         for session in self.sessions.values():
             if session.s['busy'] or session.pending or session.active(session.server) or session.active(session.tunnel):
@@ -369,6 +383,7 @@ class HostManager(QObject):
     @Slot()
     def stopAll(self):
         for session in self.sessions.values():session.stop()
+        self.playit.stop()
     def setup_tray(self):self.bridge_class.setup_tray(self)
     def restore(self):self.window.showNormal();self.window.raise_();self.window.requestActivate()
     def minimize(self):

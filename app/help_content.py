@@ -1,5 +1,38 @@
 """In-app troubleshooting from real setup issues. No account-specific defaults."""
 TOPICS=[
+ {'id': 'playit',
+ 'category': 'Connections',
+ 'title': 'Free Minecraft tunnels with playit.gg',
+ 'body': 'On Server or Settings → Hosting connection, select Use playit.gg tunnel. It is an alternative to your VPS SSH '
+         'tunnel and direct/router hosting. The options are mutually exclusive; your old VPS and direct join settings '
+         'remain saved.\n'
+         '\n'
+         '1. Choose Prepare playit to download and verify the supported official portable agent. It runs hidden inside '
+         'Saturn’s process management; no Windows service is installed.\n'
+         '2. Start playit setup. Approve agent opens the short-lived claim link in your browser. You handle account '
+         'sign-in, approval and any agreements directly with playit.gg. Do not share claim or guest-login links.\n'
+         '3. In the playit dashboard, add a Minecraft Java tunnel (rather than generic premium TCP) or a suitable Minecraft '
+         'Bedrock tunnel. Assign it to Saturn’s agent and set its local address to 127.0.0.1 and this profile’s local game '
+         'port. The UI displays the exact target. Each simultaneous server needs a separate tunnel and distinct local game '
+         'port.\n'
+         '4. Start hosting. Saturn reads the agent’s reported routes and copies the matching public address; do not '
+         'substitute the VPS or home IP. Native playit routing must match the game edition and local target. A reported '
+         'route is not proof that a game client can join. Test with the matching client/version/mods.\n'
+         '\n'
+         'Free Minecraft Java tunnels are currently available. Bedrock NetherNet currently requires Premium; playit '
+         'documents transport=raknet in server.properties as a workaround where your server supports it. Stop the server '
+         'before editing. Third-party plan limits, regions, premium features and availability are controlled by playit.gg; '
+         'Saturn does not provide a paid plan. Electricity and internet still have their usual costs.\n'
+         '\n'
+         'One portable agent is shared across all Saturn profiles. Stop shared agent disconnects all playit profiles. '
+         'Stopping the last server using it also stops the agent; Stop all and Exit Saturn stop it, including setup-only '
+         'sessions. Closing to the tray keeps hosting active.\n'
+         '\n'
+         'No matching tunnel: verify authorization, tunnel enabled status, agent assignment and 127.0.0.1:LOCAL-PORT. If '
+         'approval was revoked or the native key is invalid, stop the agent and use the playit account controls to '
+         'recover/re-claim it. If the process exits with VCRUNTIME140.dll missing, see playit’s official runtime support '
+         'instructions. Agent credentials are native playit files in your local application-data folder, outside game '
+         'worlds/backups. Never upload that account folder.'},
  {'id': 'direct-hosting',
  'category': 'Connections',
  'title': 'Host without a VPS — LAN and router port forwarding',

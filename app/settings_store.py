@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 DEFAULT_FOLDER = str(Path.home()/'MinecraftServer')
-DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'java_version':'Auto', 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'auto_backup_enabled':False, 'auto_backup_minutes':30, 'startup_animation':True, 'startup_sound':True, 'sound_enabled':True, 'sound_volume':0.3, 'tunnel_type':'Auto', 'use_vps':True, 'direct_join_address':'', 'direct_java_port':25565, 'direct_bedrock_port':19132, 'java_port_ranges':'', 'bedrock_port_ranges':'', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
+DEFAULTS = {'folder': DEFAULT_FOLDER, 'version': 'latest', 'ram': 4, 'java_version':'Auto', 'key': '', 'engine': 'Vanilla', 'loader': 'recommended', 'cf_pack': {}, 'auto_backup_enabled':False, 'auto_backup_minutes':30, 'startup_animation':True, 'startup_sound':True, 'sound_enabled':True, 'sound_volume':0.3, 'tunnel_type':'Auto', 'use_vps':True, 'use_playit':False, 'direct_join_address':'', 'direct_java_port':25565, 'direct_bedrock_port':19132, 'java_port_ranges':'', 'bedrock_port_ranges':'', 'local_java_port':25565, 'remote_java_port':25565, 'local_bedrock_port':19132, 'remote_bedrock_port':19132, 'bedrock_ipv6_port':19133, **CONNECTION_DEFAULTS}
 
 
 def validated(data):
@@ -28,7 +28,9 @@ def validated(data):
     minutes=data.get('auto_backup_minutes',30)
     if isinstance(minutes,int) and not isinstance(minutes,bool) and 5<=minutes<=1440:result['auto_backup_minutes']=minutes
     result['reduced']=bool(data.get('reduced',False))
+    result['use_playit']=data.get('use_playit',False) is True
     result['use_vps']=data.get('use_vps',True) if isinstance(data.get('use_vps',True),bool) else True
+    if result['use_playit']:result['use_vps']=False
     for key in ('direct_java_port','direct_bedrock_port'):
         try:result[key]=port(data.get(key,DEFAULTS[key]))
         except ValueError:pass

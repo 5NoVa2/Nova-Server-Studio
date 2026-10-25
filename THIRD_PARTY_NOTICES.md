@@ -31,3 +31,6 @@ It does not replace the licenses/terms of any dependency or downloaded server.
 
 No Mojang/Microsoft logos, Minecraft binaries, modpacks, private SSH keys,
 shared CurseForge API keys or user server worlds are included in this release.
+
+playit.gg optional agent: https://github.com/playit-cloud/playit-agent
+Upstream BSD-2-Clause licensing applies. Downloaded separately from the official release, not bundled in Saturn. This integration pins supported portable 0.17.1 to avoid installing a Windows service; its SHA-256 is verified before use. Third-party account/service terms apply independently. Saturn is not affiliated with playit.gg.
