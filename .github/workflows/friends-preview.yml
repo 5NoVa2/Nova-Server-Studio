@@ -14,6 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
+      PYTHONUTF8: '1'
       QT_QPA_PLATFORM: offscreen
       QT_QUICK_CONTROLS_STYLE: Basic
       QT_QUICK_BACKEND: software
@@ -26,7 +27,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y libegl1 libopengl0 openssh-server
+          sudo apt-get install -y libegl1 libopengl0 libpulse0 openssh-server
           sudo mkdir -p /run/sshd
       - name: Install application dependencies
         run: python -m pip install -r requirements.txt
@@ -44,6 +45,18 @@ jobs:
         run: |
           python installer/build_verified_installer.py --makensis "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
           Copy-Item dist/SaturnSetup.exe dist/preview/SaturnSetup.exe
+      - name: Verify every installer payload file
+        if: runner.os == 'Windows'
+        shell: python
+        run: |
+          import os,json,subprocess
+          from pathlib import Path
+          extractor=Path(os.environ['ProgramFiles'])/'7-Zip/7z.exe'
+          subprocess.run([str(extractor),'x','dist/SaturnSetup.exe','-odist/installer-check','-y'],check=True)
+          files=[p for p in Path('app').rglob('*') if p.is_file() and '__pycache__' not in p.parts]
+          for p in files:
+              assert p.read_bytes()==(Path('dist/installer-check')/p.relative_to('app')).read_bytes(),str(p)
+          Path('dist/preview/installer-check.json').write_text(json.dumps({'matched_files':len(files)}))
       - name: Package source and checksums
         if: runner.os == 'Windows'
         shell: python
