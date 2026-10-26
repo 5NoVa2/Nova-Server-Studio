@@ -25,7 +25,7 @@ def main():
   subprocess.run([sys.executable,str(root/'build_installer.py')],check=True)
   with tempfile.TemporaryDirectory(prefix='.verified-build-',dir=dist) as tmp:
    output=Path(tmp)/'SaturnSetup-Private.exe'
-   subprocess.run([args.makensis,'-WX','-V2','-DSETUP_OUTPUT='+str(output),str(root/'SaturnSetup.nsi')],check=True)
+   subprocess.run([args.makensis,'-WX','-V2','-DPAYLOAD_DIR='+str(root.parent/'app'),'-DSETUP_OUTPUT='+str(output),str(root/'SaturnSetup.nsi')],cwd=root,check=True)
    size=verify(output)
    os.replace(output,dist/'SaturnSetup.exe')
    print('Verified NSIS length and CRC:',size,'bytes')
