@@ -32,6 +32,7 @@ class Bridge(QObject):
         self.properties_original={};self.last_files_scan=0;self.last_player_poll=0;self.loaded_folder=None;self.folder_editing=False
         from players import PlayerTracker
         self.player_tracker=PlayerTracker()
+        self._friend_process=None;self._friend_sent=set();self._friend_retry_at=0
         self.secrets={'password':'','passphrase':'','apiKey':os.environ.get('CURSEFORGE_API_KEY','')}
         from secret_store import ApiKeyStore
         self.api_store=ApiKeyStore(CACHE/'curseforge-key.dpapi')
@@ -95,6 +96,8 @@ class Bridge(QObject):
     @Slot(str,'QVariant')
     def update(self,key,value):
         if self.s['exiting']:return
+        if key in ('friends','auto_whitelist_friends'):
+            self.error('Use the Friends tab to change saved friends.');return
         if key in self.secrets:
             self.secrets[key]=str(value)
             if key=='apiKey':self.api_save_timer.start(800)
@@ -141,6 +144,7 @@ class Bridge(QObject):
         return True
     @Slot(str,str)
     def draft(self,key,value):
+        if key in ('friends','auto_whitelist_friends'):return
         if key in self.store.data and not self.s['exiting']:
             if key in ('folder','engine','java_version','use_vps','use_playit','direct_java_port','direct_bedrock_port','tunnel_type','local_java_port','remote_java_port','local_bedrock_port','remote_bedrock_port','bedrock_ipv6_port') and (self.s['busy'] or self.active(self.server) or self.active(self.tunnel)):return
             if key=='folder':self.folder_editing=True
@@ -366,8 +370,8 @@ class Bridge(QObject):
         try:
             if not self.active(self.server):raise ValueError('Start the server first.')
             if any(c in text for c in '\r\n\x00'):raise ValueError('Enter one command at a time.')
-            self.server.stdin.write(text.lstrip('/')+'\n');self.server.stdin.flush()
-        except Exception as e:self.error(e)
+            self.server.stdin.write(text.lstrip('/')+'\n');self.server.stdin.flush();return True
+        except Exception as e:self.error(e);return False
     def connect_tunnel(self):
         if self.s.get('use_playit'):
             if self.s['busy'] or self.active(self.tunnel):return
@@ -403,6 +407,7 @@ class Bridge(QObject):
     def tick(self):
         self.flush_logs()
         running=self.active(self.server);tunnel=self.active(self.tunnel)
+        self._sync_friends()
         self.publish(**self.stats.sample(self.server))
         elapsed=int(time.monotonic()-self.started) if running else 0
         self.publish(joinDisplay=self.join_display(),server=('Ready' if self.ready.is_set() else 'Starting') if running else 'Stopped',tunnel=(self.owner.playit.tunnel_status(int(self.s['local_bedrock_port'] if self.tunnel_kind()=='Bedrock' else self.s['local_java_port'])) if tunnel and self.s.get('use_playit') and self.owner else ('Connected' if tunnel else 'Disconnected')),uptime='%02d:%02d:%02d'%(elapsed//3600,elapsed//60%60,elapsed%60) if running else '—')
@@ -592,6 +597,79 @@ class Bridge(QObject):
     @Slot(str,str,str,int)
     def query(self,text,sort,version,offset):
         self.query_values=(text,sort,version,offset);self.search()
+    def friend_edition(self):
+        engine=self.running_engine if self.active(self.server) else self.s.get('installedEngine') or self.s['engine']
+        return 'Bedrock' if engine=='Bedrock' else 'Java'
+    def friend_rows(self):
+        from friends import friend_key
+        edition=self.friend_edition();running=self.active(self.server)
+        rows=[]
+        for entry in self.s['friends']:
+            if entry['edition']!=edition:status='Waiting for a '+entry['edition']+' server'
+            elif running and self._friend_process is self.server and friend_key(entry) in self._friend_sent:status='Command sent this run'
+            elif not self.s['auto_whitelist_friends']:status='Auto-add is off'
+            elif not running or not self.ready.is_set():status='Queued until this server is ready'
+            else:status='Queued'
+            rows.append(dict(entry,status=status))
+        return rows
+    def _save_friends(self,rows,automatic):
+        previous=self.s['friends'];old_auto=self.s['auto_whitelist_friends']
+        self.s.update(friends=rows,auto_whitelist_friends=automatic)
+        if not self.save():
+            self.s.update(friends=previous,auto_whitelist_friends=old_auto);self.changed.emit();return False
+        self.changed.emit();return True
+    @Slot(str,str,result=bool)
+    def addFriend(self,name,edition):
+        if self.s['exiting']:return False
+        try:
+            from friends import friend_entry,friend_key,MAX_FRIENDS
+            entry=friend_entry(name,edition)
+            if any(friend_key(row)==friend_key(entry) for row in self.s['friends']):
+                raise ValueError('That friend is already saved for this edition.')
+            if len(self.s['friends'])>=MAX_FRIENDS:raise ValueError('A profile can save up to 100 friends.')
+            if not self._save_friends([*self.s['friends'],entry],self.s['auto_whitelist_friends']):return False
+            self._sync_friends();return True
+        except (ValueError,TypeError) as error:self.error(error);return False
+    @Slot(str,str)
+    def forgetFriend(self,name,edition):
+        if self.s['exiting']:return
+        from friends import friend_key
+        key=(edition,name.casefold())
+        rows=[row for row in self.s['friends'] if friend_key(row)!=key]
+        if self._save_friends(rows,self.s['auto_whitelist_friends']):
+            self._friend_sent.discard(key)
+            self.log('Friend forgotten. Existing server whitelist entries are unchanged.')
+    @Slot(bool)
+    def autoWhitelistFriends(self,enabled):
+        if self.s['exiting']:return
+        if self._save_friends(list(self.s['friends']),enabled):self._sync_friends()
+    @Slot()
+    def syncFriendsNow(self):
+        if self.s['exiting']:return
+        if not self.active(self.server) or not self.ready.is_set():
+            self.error('Start this server and wait until it is ready before syncing friends.');return
+        self._sync_friends(force=True)
+    def _sync_friends(self,force=False):
+        from friends import friend_key
+        from players import player_command
+        if self._friend_process is not self.server:
+            self._friend_process=self.server;self._friend_sent=set();self._friend_retry_at=0
+        if self.s['exiting'] or self.s['busy'] or not self.active(self.server) or not self.ready.is_set():return 0
+        if not force and (not self.s['auto_whitelist_friends'] or time.monotonic()<self._friend_retry_at):return 0
+        edition=self.friend_edition()
+        entries=[row for row in self.s['friends'] if row['edition']==edition]
+        if force:
+            for entry in entries:self._friend_sent.discard(friend_key(entry))
+        sent=0
+        for entry in entries:
+            key=friend_key(entry)
+            if key in self._friend_sent:continue
+            if not self.command(player_command('allow',entry['name'],edition=='Bedrock')):
+                self._friend_retry_at=time.monotonic()+15;break
+            self._friend_sent.add(key);sent+=1
+            if not force and sent>=5:break
+        if sent:self.changed.emit()
+        return sent
     @Slot(str,str)
     def playerAction(self,operation,name):
         try:

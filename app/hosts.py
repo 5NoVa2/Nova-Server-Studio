@@ -53,7 +53,7 @@ class HostManager(QObject):
     @Property('QVariantMap',notify=changed)
     def state(self):
         from updater import VERSION,PRIVATE_BUILD
-        values=dict(self.active.s);values.update(self.playit.snapshot());values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
+        values=dict(self.active.s);values.update(friendRows=self.active.friend_rows(),friendEdition=self.active.friend_edition());values.update(self.playit.snapshot());values.update(appVersion=VERSION+(' · Private' if PRIVATE_BUILD else ''),updatePrivate=PRIVATE_BUILD,updateBusy=self.update_busy,updateStatus=self.update_status,updateAvailable=bool(self.update_info),updateReady=bool(self.update_download),updateNotes=(self.update_info or {}).get('notes',''));values['serversRoot']=str(self.servers_root)
         values.update(profileIndex=self.current,profileName=self.entries[self.current]['name'],profileItems=[dict(entry,engine=self.sessions[entry['id']].s.get('installedEngine') or self.sessions[entry['id']].s['engine'],version=self.sessions[entry['id']].s['version'],players=len(self.sessions[entry['id']].s['players']),running=self.sessions[entry['id']].active(self.sessions[entry['id']].server),artwork=self.sessions[entry['id']].s.get('cf_pack',{}).get('artwork',''),status=(self.sessions[entry['id']].s['server']+' / '+('Needs approval' if self.sessions[entry['id']].s['dialog'] else ('playit.gg' if self.sessions[entry['id']].s.get('use_playit') else 'Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel']))),tunnel=('playit.gg' if self.sessions[entry['id']].s.get('use_playit') else 'Direct · no VPS' if not self.sessions[entry['id']].s.get('use_vps',True) else self.sessions[entry['id']].s['tunnel'])) for entry in self.entries],hostingCount=sum(session.active(session.server) for session in self.sessions.values()))
         values.update(taskCreateError=self.task_create_error,schedules=[dict(row,label=__import__('task_queue').LABELS[row['operation']]) for row in self.queue.schedules.rows],scheduleTimezone='PC local time ('+time.strftime('%Z')+')',tasks=[dict(row) for row in self.queue.rows],queueRunning=self.queue.running or self.queue.current is not None,queuePaused=self.queue.paused)
         values['busy']=self.active.s['busy'] or self.exiting or bool(self.queue.current and self.queue.current['profile']==self.active.profile_id);values['exiting']=self.exiting
@@ -378,6 +378,14 @@ class HostManager(QObject):
     def query(self,text,sort,version,offset):self.active.query(text,sort,version,offset)
     @Slot(int,int)
     def project(self,index,offset):self.active.project(index,offset)
+    @Slot(str,str,result=bool)
+    def addFriend(self,name,edition):return self.active.addFriend(name,edition)
+    @Slot(str,str)
+    def forgetFriend(self,name,edition):self.active.forgetFriend(name,edition)
+    @Slot(bool)
+    def autoWhitelistFriends(self,enabled):self.active.autoWhitelistFriends(enabled)
+    @Slot()
+    def syncFriendsNow(self):self.active.syncFriendsNow()
     @Slot(str,str)
     def playerAction(self,operation,name):self.active.playerAction(operation,name)
     @Slot()

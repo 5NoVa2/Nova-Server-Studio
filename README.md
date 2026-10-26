@@ -151,3 +151,9 @@ Select **Use playit.gg tunnel** for a third hosting option. Prepare downloads th
 Minecraft Java currently has a free tunnel option. Free Bedrock requires RakNet where supported; NetherNet currently requires Premium. Third-party limits and availability apply. See https://playit.gg/ and https://playit.gg/support/minecraft-bedrock-nethernet/. No live user account or game connection is simulated in tests.
 
 Stop shared agent affects all playit profiles; stopping the last leased profile, Stop all, or Exit stops it. A setup-only agent remains until stopped. Native playit credentials live under MCServerSwitcher/playit/account in local application data and are excluded from worlds, app logs, sources and installer payloads. The UI never forwards raw agent output or private guest-login URLs.
+
+## Friends preview
+
+Open **Players → Friends** to save exact Java usernames or Bedrock gamertags for the selected profile. Auto-add is on by default for saved friends: additions made while stopped wait until that server is ready. Commands are re-applied after each server restart, with Java and Bedrock lists kept separate. **Sync now / retry** resends matching entries on demand, including when automatic sync is off.
+
+Saturn sends normal Minecraft whitelist/allowlist commands; it never grants operator access or automatically switches the server into whitelist-only mode. “Command sent” is not confirmation that Minecraft accepted a name: check the game console. **Forget** only removes a saved friend. Existing server whitelist entries remain until explicitly removed in player management.

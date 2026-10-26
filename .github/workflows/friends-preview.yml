@@ -1,0 +1,66 @@
+name: Friends whitelist preview
+on:
+  push:
+    branches: [friends-whitelist]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_CONTROLS_STYLE: Basic
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux Qt and SSH test prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libegl1 libopengl0 openssh-server
+          sudo mkdir -p /run/sshd
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run complete test suite
+        run: python -m unittest discover -s tests -v
+      - name: Render Friends preview
+        if: runner.os == 'Windows'
+        run: python tools/preview_friends.py
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis --no-progress -y
+      - name: Build verified Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python installer/build_verified_installer.py --makensis "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          Copy-Item dist/SaturnSetup.exe dist/preview/SaturnSetup.exe
+      - name: Package source and checksums
+        if: runner.os == 'Windows'
+        shell: python
+        run: |
+          import hashlib,subprocess,zipfile
+          from pathlib import Path
+          out=Path('dist/preview')
+          with zipfile.ZipFile(out/'SaturnServerLauncher-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in subprocess.check_output(['git','ls-files'],text=True).splitlines():
+                  z.write(name,'SaturnServerLauncher/'+name)
+          names=['SaturnSetup.exe','SaturnServerLauncher-source.zip']
+          (out/'SHA256SUMS.txt').write_text(''.join(hashlib.sha256((out/n).read_bytes()).hexdigest()+'  '+n+'\n' for n in names))
+          (out/'INSTALL.txt').write_text('Saturn Friends preview. Exit Saturn from its tray before installing. Players > Friends saves names per profile and auto-adds matching friends when that server is ready. Minecraft server replies should be checked in the console. Whitelist-only mode is not enabled automatically. Forgetting a friend does not remove an existing server whitelist entry. This is a test build, not a published release.\n')
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && success()
+        with:
+          name: Saturn-Friends-Preview-Windows
+          path: dist/preview/
+          if-no-files-found: error
+          retention-days: 14
