@@ -551,8 +551,16 @@ ApplicationWindow {
                 }
                 // PLAYERS
                 Item { ColumnLayout {
-                    anchors.fill: parent; anchors.margins: 26; spacing: 16
+                    anchors.fill: parent; anchors.margins: 26; spacing: 14
                     Heading { text: 'Your players, in one place.' }
+                    TabBar {
+                        id: playerSections; objectName: 'playerSections'; Layout.fillWidth: true; background: Item {}
+                        NTab { objectName: 'onlinePlayersTab'; text: 'Online players' }
+                        NTab { objectName: 'friendsTab'; text: 'Friends' }
+                    }
+                    StackLayout {
+                        currentIndex: playerSections.currentIndex; Layout.fillWidth: true; Layout.fillHeight: true
+                        Item { ColumnLayout { anchors.fill: parent; spacing: 14
                     Body { text: 'Online players refresh every 15 seconds from this profile’s console. Modded/custom server output may require manual refresh. Commands apply only to the selected profile.'; Layout.fillWidth: true }
                     RowLayout {
                         Action { text: 'Refresh players'; onClicked: nova.playerAction('refresh','') }
@@ -574,6 +582,10 @@ ApplicationWindow {
                             }
                             Body { text: 'Operator and moderation actions ask for confirmation. Bedrock supports kick, op/deop and allowlist; native ban/pardon is Java only.'; Layout.fillWidth: true }
                         }
+                    }
+
+                        } }
+                        FriendsPage { snapshot: win.s }
                     }
                 } }
                 Item { ColumnLayout { anchors.fill: parent; anchors.margins: 26; spacing: 12

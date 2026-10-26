@@ -46,7 +46,8 @@ class PortRangeTests(unittest.TestCase):
   source=(ROOT/'app'/'vps_setup.sh').read_text();java=list(range(25565,25576));udp=list(range(19132,19143))
   script=vps_script(source,'root',java,udp)
   self.assertIn('ufw allow 25565:25575/tcp',script);self.assertIn('ufw allow 19132:19142/udp',script)
-  subprocess.run(['bash','-n'],input=script,text=True,check=True,capture_output=True)
+  bash=str(Path(os.environ.get('ProgramFiles','C:/Program Files'))/'Git/bin/bash.exe') if os.name=='nt' else 'bash'
+  subprocess.run([bash,'-n'],input=script.encode('utf-8'),check=True,capture_output=True)
   if not Path('/usr/sbin/sshd').exists():self.skipTest('sshd unavailable')
   key=self.base/'hostkey';subprocess.run(['ssh-keygen','-q','-t','ed25519','-N','','-f',str(key)],check=True)
   conf=self.base/'sshd_config';conf.write_text(f'HostKey {key}\nPort 22222\nUsePAM no\n')

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 root=Path(__file__).resolve().parent
 payload=root.parent/'app'
@@ -6,7 +7,7 @@ install=[];remove=[];parents=set()
 for p in files:
  rel=p.relative_to(payload);parent=str(rel.parent).replace('/','\\')
  install.append('SetOutPath "$INSTDIR'+('\\'+parent if parent!='.' else '')+'"')
- install.append('File "${PAYLOAD_DIR}/'+rel.as_posix()+'"')
+ install.append('File "${PAYLOAD_DIR}'+os.sep+str(rel)+'"')
  remove.append('Delete "$INSTDIR\\'+str(rel).replace('/','\\')+'"')
  if p.suffix=='.py':remove.append('Delete "$INSTDIR\\__pycache__\\'+p.stem+'.cpython-*.pyc"')
  if parent!='.':parents.add(parent)
